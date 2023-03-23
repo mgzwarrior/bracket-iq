@@ -1,1 +1,7 @@
-site_name: My Docs
+site_name: Bracket IQ
+
+nav:
+    - Home: README.md
+    - Frontend: frontend.md
+
+theme: readthedocs
