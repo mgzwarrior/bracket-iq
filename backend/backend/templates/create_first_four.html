@@ -1,0 +1,40 @@
+<!-- create_first_four.html -->
+{% extends "base_generic.html" %}
+{% load static %}
+
+{% block content %}
+    <h1>Create First Four</h1>
+    <form id="create-first-four-form" method="post" action="{% url 'create_bracket' %}">
+        {% csrf_token %}
+        {% for i in games %}
+            <div id="game{{ i }}">
+                <label for="game{{ i }}team1">Team 1:</label>
+                <select id="game{{ i }}team1" name="game{{ i }}team1">
+                    {% if i == 1 or i == 2 %}
+                        {% for team in teams10_game1 %}
+                            <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endfor %}
+                    {% else %}
+                        {% for team in teams16_game1 %}
+                            <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+                <label for="game{{ i }}team2">Team 2:</label>
+                <select id="game{{ i }}team2" name="game{{ i }}team2">
+                    {% if i == 1 or i == 2 %}
+                        {% for team in teams10_game2 %}
+                            <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endfor %}
+                    {% else %}
+                        {% for team in teams16_game2 %}
+                            <option value="{{ team.id }}">{{ team.name }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+        {% endfor %}
+        <button type="submit">Create Bracket</button>
+    </form>
+    <script src="{% static 'create_bracket.js' %}"></script>
+{% endblock %}
