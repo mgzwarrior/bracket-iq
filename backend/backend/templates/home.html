@@ -1,0 +1,16 @@
+<!-- home.html -->
+{% extends "base_generic.html" %}
+
+{% block content %}
+    <h1>Home</h1>
+    <h2>Seed Lists</h2>
+    <ul>
+        {% for seed_list in seed_lists %}
+            <li>
+                <a href="{% url 'display_seed_list' id=seed_list.id %}">{{ seed_list.id }}</a>
+            </li>
+        {% empty %}
+            <li>No seed lists have been created yet.</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

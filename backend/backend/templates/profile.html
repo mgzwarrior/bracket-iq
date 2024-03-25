@@ -1,0 +1,16 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+  <h2>Profile</h2>
+  <p>Welcome, {{ request.user.username }}!</p>
+  <h2>Brackets</h2>
+  {% for bracket in brackets %}
+      <div>
+          <h2>Bracket ID: {{ bracket.uuid }}</h2>
+          <p>Year: {{ bracket.year }}</p>
+          <a href="{% url 'display_bracket' id=bracket.id %}">View Bracket</a>
+      </div>
+  {% empty %}
+      <div>No brackets have been created yet.</div>
+  {% endfor %}
+{% endblock %}

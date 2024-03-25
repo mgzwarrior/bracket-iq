@@ -1,0 +1,11 @@
+<!-- create_live_bracket.html -->
+{% extends "base_generic.html" %}
+
+{% block content %}
+    <h1>Create Live Bracket - Game {{ game_number }}</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Next</button>
+    </form>
+{% endblock %}

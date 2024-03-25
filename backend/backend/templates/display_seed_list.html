@@ -1,0 +1,25 @@
+<!-- backend/backend/templates/display_seed_list.html -->
+{% extends "base_generic.html" %}
+{% load static %}
+
+{% block content %}
+    <h1>Seed List for {{ seed_list.year }}</h1>
+    <button id="sort-seed">Sort by Seed</button>
+    <button id="sort-true-seed">Sort by True Seed</button>
+    <form method="post" action="{% url 'create_bracket' seed_list.id %}">
+        {% csrf_token %}
+        <button type="submit">Create Bracket</button>
+    </form>
+    <ul id="seed-list">
+        {% for seed in seeds %}
+            <li data-seed="{{ seed.seed }}" data-true-seed="{{ seed.true_seed }}">
+                True Seed: {{ seed.true_seed }} - Team: {{ seed.team.name }}, Seed: {{ seed.seed }}
+            </li>
+        {% endfor %}
+    </ul>
+    <form method="post" action="{% url 'delete_seed_list' seed_list.id %}">
+        {% csrf_token %}
+        <button type="submit">Delete Seed List</button>
+    </form>
+    <script src="{% static 'sort.js' %}"></script>
+{% endblock %}
