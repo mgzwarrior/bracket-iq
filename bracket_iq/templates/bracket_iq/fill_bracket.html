@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .bracket-container {
+        display: flex;
+        overflow-x: auto;
+        padding: 20px;
+        background: #f8f9fa;
+        min-height: calc(100vh - 100px);
+    }
+    
+    .round {
+        flex: 0 0 300px;
+        margin: 0 15px;
+    }
+    
+    .round-title {
+        text-align: center;
+        margin-bottom: 20px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    
+    .region {
+        margin-bottom: 30px;
+    }
+    
+    .region-title {
+        text-align: center;
+        margin-bottom: 15px;
+        color: #34495e;
+        font-weight: 500;
+    }
+    
+    .game-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+        padding: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .game-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .team {
+        display: flex;
+        align-items: center;
+        padding: 8px;
+        cursor: pointer;
+        border-radius: 4px;
+        margin: 2px 0;
+        transition: background-color 0.2s;
+    }
+    
+    .team:hover {
+        background-color: #e9ecef;
+    }
+    
+    .team.selected {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .seed {
+        min-width: 25px;
+        text-align: center;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .team-name {
+        flex-grow: 1;
+    }
+    
+    .vs {
+        text-align: center;
+        color: #6c757d;
+        margin: 5px 0;
+        font-size: 0.8em;
+    }
+    
+    .final-four {
+        background: #e3f2fd;
+        border-radius: 12px;
+        padding: 20px;
+    }
+    
+    .championship {
+        background: #fff3cd;
+        border-radius: 12px;
+        padding: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="text-center my-4">{{ bracket.name }}</h1>
+            <div class="bracket-container">
+                {% for round_enum, regions in games_by_round.items %}
+                <div class="round">
+                    <h3 class="round-title">{{ round_enum.name }}</h3>
+                    {% for region, games in regions.items %}
+                    <div class="region {% if round_enum.value >= 6 %}final-four{% endif %} {% if round_enum.value == 7 %}championship{% endif %}">
+                        {% if region != 'Final' %}
+                            <h4 class="region-title">{{ region }}</h4>
+                        {% endif %}
+                        {% for game in games %}
+                        <div class="game-card" id="game-{{ game.id }}">
+                            <form method="post" class="game-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="game_id" value="{{ game.id }}">
+                                {% if game.team1 %}
+                                <div class="team {% if game.id in predictions and predictions|get_item:game.id == game.team1 %}selected{% endif %}"
+                                     onclick="submitWinner(this, '{{ game.id }}', '{{ game.team1.id }}')">
+                                    <div class="seed">#{{ game.seed1 }}</div>
+                                    <div class="team-name">{{ game.team1.name }}</div>
+                                </div>
+                                {% endif %}
+                                <div class="vs">vs</div>
+                                {% if game.team2 %}
+                                <div class="team {% if game.id in predictions and predictions|get_item:game.id == game.team2 %}selected{% endif %}"
+                                     onclick="submitWinner(this, '{{ game.id }}', '{{ game.team2.id }}')">
+                                    <div class="seed">#{{ game.seed2 }}</div>
+                                    <div class="team-name">{{ game.team2.name }}</div>
+                                </div>
+                                {% endif %}
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function submitWinner(element, gameId, winnerId) {
+    const form = element.closest('form');
+    const winnerInput = document.createElement('input');
+    winnerInput.type = 'hidden';
+    winnerInput.name = 'winner';
+    winnerInput.value = winnerId;
+    form.appendChild(winnerInput);
+    form.submit();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Scroll to first incomplete game
+    const incompleteGame = document.querySelector('.game-card:not(:has(.selected))');
+    if (incompleteGame) {
+        incompleteGame.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+});
+</script>
+{% endblock %} 

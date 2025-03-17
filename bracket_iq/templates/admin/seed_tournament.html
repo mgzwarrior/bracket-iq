@@ -1,0 +1,37 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>Seed Tournament</h2>
+        <div class="description">
+            <p>This will seed a new tournament for the selected year. This process will:</p>
+            <ul>
+                <li>Delete any existing tournament data for the selected year</li>
+                <li>Create a new tournament entry</li>
+                <li>Set up all regions (South, East, West, Midwest)</li>
+                <li>Create seed lists with team rankings</li>
+                <li>Generate First Four matchups</li>
+                <li>Set up the initial tournament bracket structure</li>
+            </ul>
+            <p class="warning" style="color: red;">Warning: This action cannot be undone.</p>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-row">
+                <label for="year">Tournament Year:</label>
+                <select name="year" id="year" required>
+                    {% for year in years %}
+                        <option value="{{ year }}">{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="submit-row">
+                <input type="submit" value="Seed Tournament" class="default" style="margin-top: 20px;">
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

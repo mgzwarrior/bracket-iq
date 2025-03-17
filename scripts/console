@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e
+script_base=$(dirname "$0")
+source $script_base/tools
+cd $script_base/..
+
+load_env
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help|?)
+            echo "Start a Django Python shell."
+            echo
+            cecho "Usage: $(basename $0) <options>" default bold
+            echo
+            echo "Options:"
+            echo "  -h  --help          This help message"
+            echo "  -p  --plain         Use plain Python shell instead of IPython"
+            echo
+            echo "Examples:"
+            echo "  $(basename $0)                    # Start IPython shell"
+            echo "  $(basename $0) -p                 # Start plain Python shell"
+            exit 0
+            ;;
+        -p|--plain)
+            plain=1
+            shift
+            ;;
+        *)
+            POSITIONAL+=("$key")
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}"
+
+# Check if we're running in Docker
+if [ "$(service_running web)" ]; then
+    cmd="docker compose exec web python manage.py"
+else
+    # Activate virtual environment if it exists
+    if [ -d "venv" ]; then
+        source venv/bin/activate
+    fi
+    cmd="python manage.py"
+fi
+
+if [ "$plain" ]; then
+    $cmd shell
+else
+    $cmd shell_plus --ipython || $cmd shell
+fi 

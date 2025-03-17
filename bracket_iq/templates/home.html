@@ -1,0 +1,65 @@
+<!-- home.html -->
+{% extends "base_generic.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center">
+    <h1>Welcome to BracketIQ</h1>
+    <p class="lead">Your intelligent March Madness bracket assistant</p>
+</div>
+
+<div class="bracket-container">
+    <h2>Tournaments</h2>
+    {% if tournaments %}
+        <div class="tournament-grid">
+            {% for tournament in tournaments %}
+                <div class="card">
+                    <h3>{{ tournament.name }}</h3>
+                    <p>Year: {{ tournament.year }}</p>
+                    <p>Dates: {{ tournament.start_date|date:"M d" }} - {{ tournament.end_date|date:"M d, Y" }}</p>
+                    <div class="card-actions">
+                        <a href="{% url 'create_bracket' tournament_id=tournament.id %}" class="btn">Create Bracket</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card text-center">
+            <p>No tournaments are available yet.</p>
+            {% if user.is_staff %}
+                <a href="{% url 'admin:seed_tournament' %}" class="btn">Seed a Tournament</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+{% if user.is_authenticated %}
+    <div class="bracket-container mt-4">
+        <h2>Your Brackets</h2>
+        {% with user_brackets=user.bracket_set.all %}
+            {% if user_brackets %}
+                <div class="bracket-grid">
+                    {% for bracket in user_brackets %}
+                        <div class="card">
+                            <h3>{{ bracket.tournament.name }}</h3>
+                            <p>Created: {{ bracket.created_at|date:"M d, Y" }}</p>
+                            <div class="card-actions">
+                                <a href="{% url 'display_bracket' bracket_id=bracket.id %}" class="btn">View Bracket</a>
+                                <form method="post" action="{% url 'delete_bracket' bracket_id=bracket.id %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card text-center">
+                    <p>You haven't created any brackets yet.</p>
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+{% endif %}
+{% endblock %}

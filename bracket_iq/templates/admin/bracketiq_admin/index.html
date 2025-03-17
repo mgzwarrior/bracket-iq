@@ -1,0 +1,18 @@
+{% extends "admin/index.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="module" style="margin-bottom: 20px;">
+    <h2>Tournament Management</h2>
+    <div class="description" style="padding: 10px;">
+        <a href="{% url 'admin:seed_tournament' %}" class="button" style="background: var(--button-bg); color: var(--button-fg); padding: 10px 15px; border-radius: 4px; text-decoration: none; display: inline-block; margin-right: 10px;">
+            Seed Tournament
+        </a>
+        <p style="margin-top: 10px;">
+            Use this button to seed a new tournament. This will create all necessary tournament data including teams, regions, and initial matchups.
+        </p>
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %} 
