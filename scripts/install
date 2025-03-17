@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+script_base=$(dirname "$0")
+source $script_base/tools
+cd $script_base/..
+
+load_env
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help|?)
+            echo "Install project dependencies."
+            echo
+            cecho "Usage: $(basename $0) <options> [package...]" default bold
+            echo
+            echo "Options:"
+            echo "  -h  --help          This help message"
+            echo "  -d  --dev           Install development dependencies"
+            echo "  -s  --save          Save installed packages to requirements.txt"
+            echo
+            echo "Examples:"
+            echo "  $(basename $0)                    # Install all dependencies"
+            echo "  $(basename $0) django             # Install django"
+            echo "  $(basename $0) -s django==4.2     # Install and save specific version"
+            exit 0
+            ;;
+        -d|--dev)
+            dev=1
+            shift
+            ;;
+        -s|--save)
+            save=1
+            shift
+            ;;
+        *)
+            POSITIONAL+=("$key")
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}"
+
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    source venv/bin/activate
+fi
+
+if [ "$1" ]; then
+    # Install specific packages
+    if [ "$save" ]; then
+        pip install "$@"
+        pip freeze | grep -i "^$1" >> requirements.txt
+        sort -u requirements.txt -o requirements.txt
+        cecho "Added $@ to requirements.txt" green
+    else
+        pip install "$@"
+    fi
+else
+    # Install all dependencies
+    if [ "$dev" ]; then
+        if [ -f "requirements-dev.txt" ]; then
+            pip install -r requirements-dev.txt
+        else
+            cecho "No requirements-dev.txt found" yellow
+            pip install -r requirements.txt
+        fi
+    else
+        pip install -r requirements.txt
+    fi
+fi 

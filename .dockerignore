@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv
+*.so
+
+# Django
+*.log
+db.sqlite3
+media
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Development
+.env
+.env.*
+*.pytest_cache
+.coverage
+htmlcov/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Node
+node_modules/
+
+# Documentation
+docs/
+README.md
+LICENSE 

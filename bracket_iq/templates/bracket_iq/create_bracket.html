@@ -1,0 +1,37 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Create a New Bracket</h2>
+    
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if tournaments %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="tournament">Select Tournament:</label>
+                <select name="tournament" id="tournament" class="form-control">
+                    <option value="">-- Select a Tournament --</option>
+                    {% for tournament in tournaments %}
+                    <option value="{{ tournament.id }}">{{ tournament.name }} {{ tournament.year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Create Bracket</button>
+        </form>
+    {% else %}
+        <div class="alert alert-info">
+            No tournaments are currently available for creating brackets.
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

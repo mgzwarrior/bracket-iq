@@ -1,0 +1,68 @@
+#!/bin/bash
+set -e
+script_base=$(dirname "$0")
+source $script_base/tools
+cd $script_base/..
+
+load_env
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help|?)
+            echo "Run database migrations."
+            echo
+            cecho "Usage: $(basename $0) <options> [app_label] [migration_name]" default bold
+            echo
+            echo "Options:"
+            echo "  -h  --help          This help message"
+            echo "  -m  --make          Make migrations instead of applying them"
+            echo "  -s  --show          Show migration plan"
+            echo "  -f  --fake          Mark migrations as run without actually executing them"
+            echo
+            echo "Examples:"
+            echo "  $(basename $0)                    # Apply all migrations"
+            echo "  $(basename $0) -m                 # Make migrations for all apps"
+            echo "  $(basename $0) -m bracket_iq      # Make migrations for specific app"
+            echo "  $(basename $0) bracket_iq         # Migrate specific app"
+            echo "  $(basename $0) -s                 # Show migration plan"
+            exit 0
+            ;;
+        -m|--make)
+            make=1
+            shift
+            ;;
+        -s|--show)
+            show=1
+            shift
+            ;;
+        -f|--fake)
+            fake="--fake"
+            shift
+            ;;
+        *)
+            POSITIONAL+=("$key")
+            ;;
+    esac
+done
+set -- "${POSITIONAL[@]}"
+
+# Check if we're running in Docker
+if [ "$(service_running web)" ]; then
+    cmd="docker compose exec web python manage.py"
+else
+    # Activate virtual environment if it exists
+    if [ -d "venv" ]; then
+        source venv/bin/activate
+    fi
+    cmd="python manage.py"
+fi
+
+if [ "$make" ]; then
+    $cmd makemigrations $@
+elif [ "$show" ]; then
+    $cmd showmigrations $@
+else
+    $cmd migrate $@ $fake
+fi 
