@@ -14,6 +14,7 @@ jobs:
       DEV_DOCKER_WORKFLOW: 'none'
       DB_ENGINE: django.db.backends.sqlite3
       DB_NAME: bracket-iq-tests
+      NO_DOCKER: 'true'
     
     strategy:
       matrix:

@@ -84,17 +84,35 @@ can_run_docker() {
     return 1  # Docker is not available
 }
 
+# Function to check if Docker Compose is available (either format)
+can_run_docker_compose() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        DOCKER_COMPOSE="docker-compose"
+        return 0
+    elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        DOCKER_COMPOSE="docker compose"
+        return 0
+    fi
+    return 1
+}
+
 # Set up testing environment
-if can_run_docker; then
+if [ "${NO_DOCKER}" != "true" ] && can_run_docker && can_run_docker_compose; then
     echo "Running tests in Docker container..."
     
     # Ensure pytest and related packages are installed in the container
-    docker-compose run --rm web pip install -q pytest pytest-django pytest-cov pytest-xdist
+    $DOCKER_COMPOSE run --rm web pip install -q pytest pytest-django pytest-cov pytest-xdist
     
     # Set up runner for Docker
-    runner="docker-compose run --rm -e DJANGO_SETTINGS_MODULE=bracket_iq.settings.test -e PYTHONPATH=/app web"
+    runner="$DOCKER_COMPOSE run --rm -e DJANGO_SETTINGS_MODULE=bracket_iq.settings.test -e PYTHONPATH=/app web"
 else
-    echo "Docker not available. Running tests locally..."
+    if [ "${NO_DOCKER}" == "true" ]; then
+        echo "Docker disabled by NO_DOCKER environment variable. Running tests locally..."
+    elif can_run_docker; then
+        echo "Docker available but Docker Compose not found. Running tests locally..."
+    else
+        echo "Docker not available. Running tests locally..."
+    fi
     # Check if we're in a virtual environment, activate if not
     if [[ -z "${VIRTUAL_ENV}" ]]; then
         if [ -d "venv" ]; then
