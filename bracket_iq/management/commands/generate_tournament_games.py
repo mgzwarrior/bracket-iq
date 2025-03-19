@@ -2,8 +2,13 @@ from datetime import datetime, timedelta
 from typing import Dict
 
 from django.core.management.base import BaseCommand
+from django.utils.termcolors import make_style
 
 from bracket_iq.models import Tournament, Team, Game, Region, Round
+
+# Create styles for output
+SUCCESS = make_style(fg="green")
+ERROR = make_style(fg="red")
 
 
 class Command(BaseCommand):
@@ -80,7 +85,7 @@ class Command(BaseCommand):
         # Continue with the rest of the tournament structure
         self.create_subsequent_rounds(tournament, games_by_round, game_number)
 
-        self.stdout.write(self.style.SUCCESS("Tournament games generated successfully"))
+        self.stdout.write(SUCCESS("Tournament games generated successfully"))
 
     def create_subsequent_rounds(self, tournament, games_by_round, game_number):
         # Create Round of 32 (winners of Round of 64)

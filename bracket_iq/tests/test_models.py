@@ -1,7 +1,9 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 from ..models import Team, Bracket, Game, Prediction, Round, Tournament, Region
+
+User = get_user_model()
 
 
 class TeamModelTests(TestCase):
