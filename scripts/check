@@ -47,5 +47,14 @@ else
   mypy bracket_iq || echo "MyPy found issues but continuing..."
 fi
 
+echo "Running Django system checks..."
+if [ "$CHECK_ONLY" = "true" ]; then
+  # In CI mode, use test settings
+  python manage.py check --settings=bracket_iq.settings.test
+else
+  # In development mode, use the current settings or specify development settings
+  python manage.py check || echo "Django system checks found issues but continuing..."
+fi
+
 echo "All checks completed."
 exit 0 
