@@ -1,6 +1,11 @@
 # backend/backend/management/commands/seed_teams.py
 from django.core.management.base import BaseCommand
+from django.utils.termcolors import make_style
 from bracket_iq.models import Team
+
+# Create styles for output
+SUCCESS = make_style(fg="green")
+ERROR = make_style(fg="red")
 
 
 class Command(BaseCommand):
@@ -369,4 +374,4 @@ class Command(BaseCommand):
                 },
             )
 
-        self.stdout.write(self.style.SUCCESS("Successfully seeded team data"))
+        self.stdout.write(SUCCESS("Successfully seeded team data"))

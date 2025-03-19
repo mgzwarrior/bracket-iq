@@ -4,8 +4,10 @@ from datetime import date
 from enum import Enum
 
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+
+User = get_user_model()
 
 
 class Region(models.TextChoices):
