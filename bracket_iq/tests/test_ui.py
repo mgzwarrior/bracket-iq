@@ -90,15 +90,12 @@ class UITests(TestCase):
         """Test that our flash messages work properly."""
         # Create a bracket and then try to access it
         bracket = Bracket.objects.create(
-            user=self.user,
-            tournament=self.tournament,
-            name="Test Bracket"
+            user=self.user, tournament=self.tournament, name="Test Bracket"
         )
 
         # Delete the bracket - this should trigger a success message
         response = self.client.post(
-            reverse("delete_bracket", args=[bracket.pk]),
-            follow=True
+            reverse("delete_bracket", args=[bracket.pk]), follow=True
         )
 
         # Check the response status and redirects
@@ -112,9 +109,7 @@ class UITests(TestCase):
         """Test that bracket display page URL pattern works correctly"""
         # Create a bracket for testing
         bracket = Bracket.objects.create(
-            user=self.user,
-            tournament=self.tournament,
-            name="Test Bracket"
+            user=self.user, tournament=self.tournament, name="Test Bracket"
         )
 
         # Get the URL for the bracket display page
