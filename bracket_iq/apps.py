@@ -1,8 +1,10 @@
 # bracket_iq/apps.py
 from django.apps import AppConfig
+from django.conf import settings
 from django.core.management import call_command
+from django.db.models.signals import post_migrate
 from django.db.utils import OperationalError, ProgrammingError
-from django.db import connection
+from django.dispatch import receiver
 
 
 class BracketIQConfig(AppConfig):
@@ -10,25 +12,31 @@ class BracketIQConfig(AppConfig):
     name = "bracket_iq"
 
     def ready(self):
-        try:
-            # Check if the teams table exists first
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'bracket_iq_team'
-                    );
-                """
-                )
-                table_exists = cursor.fetchone()[0]
+        # Skip database checks during testing, migrations, and other non-runtime scenarios
+        # to avoid the RuntimeWarning
+        if settings.configured and (
+            "test" in settings.SETTINGS_MODULE
+            or "migrat" in " ".join(settings.INSTALLED_APPS)
+            or any(
+                cmd in " ".join(settings.INSTALLED_APPS)
+                for cmd in ["makemigrations", "migrate", "collectstatic"]
+            )
+        ):
+            return
 
-            if table_exists:
-                # Only check for teams if the table exists
-                Team = self.get_model("Team")
-                if not Team.objects.exists():
-                    call_command("seed_teams")
+        # Register signal handler for post_migrate
+        post_migrate.connect(seed_initial_data, sender=self)
 
-        except (OperationalError, ProgrammingError):
-            # Database isn't ready or table doesn't exist yet
-            pass
+
+@receiver(post_migrate)
+def seed_initial_data(sender, **kwargs):
+    """Seed initial data after migrations are applied."""
+    try:
+        # Only check for teams after migrations have been applied
+        # Import the model from sender to avoid circular imports
+        Team = sender.get_model("Team") if hasattr(sender, "get_model") else None
+        if Team and not Team.objects.exists():
+            call_command("seed_teams")
+    except (OperationalError, ProgrammingError):
+        # Database isn't ready or table doesn't exist yet
+        pass
