@@ -1,6 +1,11 @@
 from django.core.management.base import BaseCommand
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils.termcolors import make_style
+
+# Create styles for output
+SUCCESS = make_style(fg="green")
+ERROR = make_style(fg="red")
 
 
 class Command(BaseCommand):
@@ -32,7 +37,7 @@ class Command(BaseCommand):
                 fail_silently=False,
             )
 
-            self.stdout.write(self.style.SUCCESS("Successfully sent test email!"))
+            self.stdout.write(SUCCESS("Successfully sent test email!"))
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Failed to send email: {str(e)}"))
+            self.stdout.write(ERROR(f"Failed to send email: {str(e)}"))

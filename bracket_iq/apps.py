@@ -16,7 +16,7 @@ class BracketIQConfig(AppConfig):
                 cursor.execute(
                     """
                     SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
+                        SELECT FROM information_schema.tables
                         WHERE table_name = 'bracket_iq_team'
                     );
                 """

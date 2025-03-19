@@ -2,11 +2,18 @@ from datetime import datetime, timedelta
 from typing import Dict, List
 
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
+from django.utils.termcolors import make_style
 
 from bracket_iq.models import Tournament, Team, Game, Region, Round, Bracket
+
+User = get_user_model()
+
+# Create styles for output
+SUCCESS = make_style(fg="green")
+ERROR = make_style(fg="red")
 
 
 class Command(BaseCommand):
@@ -260,6 +267,4 @@ class Command(BaseCommand):
                     games_per_region[region].append(game)
                     game_number += 1
 
-            self.stdout.write(
-                self.style.SUCCESS("Successfully seeded 2025 tournament data")
-            )
+            self.stdout.write(SUCCESS("Successfully seeded 2025 tournament data"))
