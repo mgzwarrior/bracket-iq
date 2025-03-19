@@ -1,8 +1,9 @@
-from django.core.management.base import BaseCommand
-from django.utils import timezone
 from datetime import datetime, timedelta
+from typing import Dict
+
+from django.core.management.base import BaseCommand
+
 from bracket_iq.models import Tournament, Team, Game, Region, Round
-from django.db.models import Q
 
 
 class Command(BaseCommand):
@@ -16,7 +17,7 @@ class Command(BaseCommand):
         game_number = 5
 
         # Dictionary to store games by round for linking
-        games_by_round = {
+        games_by_round: Dict[int, Dict[int, Game]] = {
             Round.FIRST_FOUR.value: {},
             Round.ROUND_OF_64.value: {},
             Round.ROUND_OF_32.value: {},

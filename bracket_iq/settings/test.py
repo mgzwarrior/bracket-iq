@@ -62,11 +62,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "bracket_iq.wsgi.application"
 
 # Database
-# Use SQLite for tests to avoid PostgreSQL connection issues
+# Use PostgreSQL for tests to match Docker environment
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+        "ENGINE": os.environ.get("TEST_DB_ENGINE", "django.db.backends.postgresql"),
+        "NAME": os.environ.get("TEST_DB_NAME", "bracket_iq"),
+        "USER": os.environ.get("TEST_DB_USER", "postgres"),
+        "PASSWORD": os.environ.get("TEST_DB_PASSWORD", "postgres"),
+        "HOST": os.environ.get("TEST_DB_HOST", "db"),
+        "PORT": os.environ.get("TEST_DB_PORT", "5432"),
     }
 }
 

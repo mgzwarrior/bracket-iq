@@ -45,8 +45,8 @@ class UITests(TestCase):
 
     def test_home_page_empty_state(self):
         """Test the empty state of the home page when no tournaments exist."""
-        # Delete the tournament created in setUp
-        self.tournament.delete()
+        # Delete ALL tournaments to ensure empty state
+        Tournament.objects.all().delete()
 
         response = self.client.get(reverse("home"))
 

@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+script_base=$(dirname "$0")
+source $script_base/tools
+cd $script_base/..
+
+load_env
+
+no_input=
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -y|--no-input)
+            no_input=1
+            ;;
+        -h|--help|?)
+            echo "Clean up build files, caches and excess Docker artifacts."
+            echo
+            cecho "Usage: $(basename $0) <options>" default bold
+            echo
+            echo "Options:"
+            echo "  -y  --no-input      Assume yes for all user input"
+            echo "  -h  --help          This help message"
+            exit 0
+            ;;
+        *)
+            POSITIONAL+=("$key")
+            ;;
+    esac
+    shift
+done
+set -- "${POSITIONAL[@]}"
+
+if [ ! "$no_input" ]; then
+    cecho "This will stop running services and delete cache, build files and docker volumes." yellow bold
+    read -n1 -r -p "Press 'Y' to continue or any other key to cancel..." key
+    echo
+    if [ ! "$key" ] || [[ "yY" != *"$key"* ]]; then
+        echo
+        cecho "Aborting." red
+        exit 0
+    fi
+fi
+
+if [ "$(which docker)" ] && [ ! "$DEV_DOCKER_WORKFLOW" = "none" ]; then
+    echo
+    cecho "Stopping running services..." default bold
+    $script_base/stop -q
+
+    echo
+    cecho "Deleting stopped Docker images, cache and dangling images..." default bold
+    docker system prune -f
+
+    echo
+    cecho "Dropping cache data volumes..." default bold
+    docker volume rm -f bracket-iq_postgres_data || true
+fi
+
+echo
+cecho "Deleting python cache files..." default bold
+find . -type d -name __pycache__ -exec rm -rf {} +
+find . -type f -name "*.pyc" -delete
+find . -type f -name "*.pyo" -delete
+find . -type f -name "*.pyd" -delete
+find . -type d -name ".pytest_cache" -exec rm -rf {} +
+find . -type d -name ".coverage" -exec rm -rf {} +
+find . -type d -name "htmlcov" -exec rm -rf {} +
+find . -type f -name ".coverage" -delete
+
+echo
+cecho "Cleanup complete!" green bold 

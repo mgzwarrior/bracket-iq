@@ -25,8 +25,7 @@ class BracketIQConfig(AppConfig):
 
             if table_exists:
                 # Only check for teams if the table exists
-                from .models import Team
-
+                Team = self.get_model("Team")
                 if not Team.objects.exists():
                     call_command("seed_teams")
 

@@ -1,9 +1,12 @@
-from django.core.management.base import BaseCommand
-from django.utils import timezone
 from datetime import datetime, timedelta
-from bracket_iq.models import Tournament, Team, Game, Region, Round, Bracket
+from typing import Dict, List
+
+from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils import timezone
+
+from bracket_iq.models import Tournament, Team, Game, Region, Round, Bracket
 
 
 class Command(BaseCommand):
@@ -20,11 +23,17 @@ class Command(BaseCommand):
                 admin_user.save()
 
             # Create the 2025 tournament with timezone-aware dates
-            tournament = Tournament.objects.create(
+            tournament, created = Tournament.objects.get_or_create(
                 year=2025,
                 name="2025 NCAA March Madness",
-                start_date=datetime(2025, 3, 18).date(),  # First Four starts March 18
-                end_date=datetime(2025, 4, 7).date(),  # Championship game on April 7
+                defaults={
+                    "start_date": datetime(
+                        2025, 3, 18
+                    ).date(),  # First Four starts March 18
+                    "end_date": datetime(
+                        2025, 4, 7
+                    ).date(),  # Championship game on April 7
+                },
             )
 
             # Create the official tournament bracket owned by system user
@@ -157,7 +166,7 @@ class Command(BaseCommand):
                 datetime(2025, 3, 21, 12, 0)
             )  # Start at noon ET on March 21
             # Initialize games_per_region with actual Region values
-            games_per_region = {
+            games_per_region: Dict[Region, List[Game]] = {
                 Region.SOUTH: [],
                 Region.EAST: [],
                 Region.MIDWEST: [],

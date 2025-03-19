@@ -1,16 +1,15 @@
-from django.contrib import admin
-from django.urls import path
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.core.management import call_command
-from django.db import transaction
-from django.template.response import TemplateResponse
-from .models import Tournament, Team, Game, Bracket, Round, Region, Prediction
+import datetime
 import re
-import os
-from django.conf import settings
+
+from django.contrib import admin
 from django.contrib.admin import AdminSite
-from django.utils.html import format_html
+from django.contrib import messages
+from django.core.management import call_command, get_commands
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path
+
+from .models import Tournament, Team, Game, Bracket, Prediction
 
 
 class BracketIQAdminSite(AdminSite):
@@ -31,49 +30,45 @@ class BracketIQAdminSite(AdminSite):
         return custom_urls + urls
 
     def seed_tournament_view(self, request):
-        context = {
-            **self.each_context(request),
-            "title": "Seed Tournament",
-        }
+        context = dict(
+            # Include common variables for rendering the admin template.
+            self.each_context(request),
+        )
+
+        # Dynamically discover available tournament seeding commands
+        # Find all management commands
+        available_years = []
+        commands = get_commands()
+
+        # Look for commands matching the pattern seed_tournament_YYYY
+        for command_name in commands:
+            match = re.match(r"seed_tournament_(\d{4})$", command_name)
+            if match:
+                year = match.group(1)
+                available_years.append(int(year))
+
+        # Sort years in descending order (newest first)
+        available_years.sort(reverse=True)
+
+        # If no years found, add current year as fallback
+        if not available_years:
+            current_year = datetime.datetime.now().year
+            available_years = [current_year]
+
+        context["years"] = available_years
 
         if request.method == "POST":
             year = request.POST.get("year")
-            generate_games = request.POST.get("generate_games") == "on"
+            if not year:
+                messages.error(request, "Year is required.")
+                return redirect("admin:index")
 
             try:
-                with transaction.atomic():
-                    # Check if tournament already exists
-                    if Tournament.objects.filter(year=year).exists():
-                        tournament = Tournament.objects.get(year=year)
-                        messages.warning(
-                            request,
-                            f"Tournament for {year} already exists. Using existing tournament.",
-                        )
-                    else:
-                        # Create a new tournament
-                        start_date = f"{year}-03-19"  # Default start date
-                        end_date = f"{year}-04-08"  # Default end date
-                        tournament = Tournament.objects.create(
-                            year=year,
-                            name=f"NCAA March Madness {year}",
-                            start_date=start_date,
-                            end_date=end_date,
-                        )
-                        messages.success(
-                            request, f"Tournament for {year} created successfully."
-                        )
+                # Don't create the tournament here - let the management command handle it
 
-                    # Run the management command to seed teams
-                    call_command("seed_teams")
-                    messages.success(request, "Teams seeded successfully.")
-
-                    if generate_games:
-                        # Run the management command to generate tournament games
-                        call_command("generate_tournament_games", year=year)
-                        messages.success(
-                            request,
-                            f"Games for {year} tournament generated successfully.",
-                        )
+                # Run seeding commands
+                call_command("seed_teams")
+                call_command(f"seed_tournament_{year}")
 
                 return redirect("admin:index")
 
@@ -111,12 +106,16 @@ class TournamentAdmin(admin.ModelAdmin):
     inlines = [GameInline]
 
     def games_completed(self, obj):
-        """Display how many games have been completed in this tournament."""
-        total_games = Game.objects.filter(tournament=obj).count()
         completed_games = Game.objects.filter(
             tournament=obj, winner__isnull=False
         ).count()
-        return f"{completed_games}/{total_games}"
+        total_games = Game.objects.filter(tournament=obj).count()
+
+        if total_games == 0:
+            return "0%"
+
+        completion_percentage = (completed_games / total_games) * 100
+        return f"{completed_games}/{total_games} ({completion_percentage:.1f}%)"
 
     games_completed.short_description = "Games Completed"
 

@@ -16,7 +16,7 @@ class Command(BaseCommand):
             self.stdout.write("Attempting to send test email...")
 
             # Print configuration for verification
-            self.stdout.write(f"Using email configuration:")
+            self.stdout.write("Using email configuration:")
             self.stdout.write(f"EMAIL_HOST: {settings.EMAIL_HOST}")
             self.stdout.write(f"EMAIL_PORT: {settings.EMAIL_PORT}")
             self.stdout.write(f"EMAIL_USE_TLS: {settings.EMAIL_USE_TLS}")
