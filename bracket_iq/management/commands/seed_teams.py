@@ -2,8 +2,9 @@
 from django.core.management.base import BaseCommand
 from bracket_iq.models import Team
 
+
 class Command(BaseCommand):
-    help = 'Seeds the database with team data'
+    help = "Seeds the database with team data"
 
     def handle(self, *args, **options):
         # Dictionary of team data with full name as key and tuple of (short_name, mascot) as value
@@ -356,16 +357,16 @@ class Command(BaseCommand):
             "Wyoming": ("Wyoming", "Cowboys"),
             "Xavier": ("Xavier", "Musketeers"),
             "Yale": ("Yale", "Bulldogs"),
-            "Youngstown State": ("YSU", "Penguins")
+            "Youngstown State": ("YSU", "Penguins"),
         }
 
         for name, (short_name, mascot) in team_data.items():
             Team.objects.get_or_create(
                 name=name,
                 defaults={
-                    'short_name': short_name,
-                    'mascot': mascot,
-                }
+                    "short_name": short_name,
+                    "mascot": mascot,
+                },
             )
 
-        self.stdout.write(self.style.SUCCESS('Successfully seeded team data'))
+        self.stdout.write(self.style.SUCCESS("Successfully seeded team data"))

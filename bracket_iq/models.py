@@ -7,21 +7,23 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
+
 class Region(models.TextChoices):
-    EAST = 'EAST', 'East'
-    WEST = 'WEST', 'West'
-    MIDWEST = 'MIDWEST', 'Midwest'
-    SOUTH = 'SOUTH', 'South'
-    FIRST_FOUR = 'FIRST_FOUR', 'First Four'
+    EAST = "EAST", "East"
+    WEST = "WEST", "West"
+    MIDWEST = "MIDWEST", "Midwest"
+    SOUTH = "SOUTH", "South"
+    FIRST_FOUR = "FIRST_FOUR", "First Four"
+
 
 class Round(Enum):
-    FIRST_FOUR = (0, 'First Four')
-    ROUND_OF_64 = (1, 'Round of 64')
-    ROUND_OF_32 = (2, 'Round of 32')
-    SWEET_16 = (3, 'Sweet 16')
-    ELITE_8 = (4, 'Elite Eight')
-    FINAL_FOUR = (5, 'Final Four')
-    CHAMPIONSHIP = (6, 'Championship')
+    FIRST_FOUR = (0, "First Four")
+    ROUND_OF_64 = (1, "Round of 64")
+    ROUND_OF_32 = (2, "Round of 32")
+    SWEET_16 = (3, "Sweet 16")
+    ELITE_8 = (4, "Elite Eight")
+    FINAL_FOUR = (5, "Final Four")
+    CHAMPIONSHIP = (6, "Championship")
 
     def __init__(self, id, label):
         self.id = id
@@ -44,7 +46,7 @@ class Round(Enum):
             cls.SWEET_16.id: 4,
             cls.ELITE_8.id: 8,
             cls.FINAL_FOUR.id: 16,
-            cls.CHAMPIONSHIP.id: 32
+            cls.CHAMPIONSHIP.id: 32,
         }
         return points_map.get(round_value, 0)
 
@@ -55,6 +57,7 @@ class Round(Enum):
     def __str__(self):
         return self.label
 
+
 class Tournament(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     year = models.IntegerField(default=date.today().year)
@@ -63,12 +66,13 @@ class Tournament(models.Model):
     end_date = models.DateField()
 
     class Meta:
-        app_label = 'bracket_iq'
-        unique_together = ('year', 'name')
-        ordering = ['-year']
+        app_label = "bracket_iq"
+        unique_together = ("year", "name")
+        ordering = ["-year"]
 
     def __str__(self):
         return f"{self.name}"
+
 
 class Team(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
@@ -77,10 +81,11 @@ class Team(models.Model):
     mascot = models.CharField(max_length=100)
 
     class Meta:
-        app_label = 'bracket_iq'
+        app_label = "bracket_iq"
 
     def __str__(self):
         return f"{self.name}"
+
 
 class Bracket(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
@@ -108,9 +113,10 @@ class Bracket(models.Model):
         return f"{self.user.username}'s {self.tournament} Bracket"
 
     class Meta:
-        app_label = 'bracket_iq'
-        unique_together = ('tournament', 'user', 'name')
-        ordering = ['-created_at']
+        app_label = "bracket_iq"
+        unique_together = ("tournament", "user", "name")
+        ordering = ["-created_at"]
+
 
 class Game(models.Model):
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE)
@@ -119,15 +125,31 @@ class Game(models.Model):
     region = models.CharField(max_length=20, choices=Region.choices)
     game_number = models.IntegerField()
     seed1 = models.IntegerField()
-    team1 = models.ForeignKey(Team, related_name='team1_games', on_delete=models.CASCADE, null=True, blank=True)
+    team1 = models.ForeignKey(
+        Team,
+        related_name="team1_games",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
     seed2 = models.IntegerField()
-    team2 = models.ForeignKey(Team, related_name='team2_games', on_delete=models.CASCADE, null=True, blank=True)
-    winner = models.ForeignKey(Team, related_name='games_won', on_delete=models.CASCADE, null=True, blank=True)
+    team2 = models.ForeignKey(
+        Team,
+        related_name="team2_games",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    winner = models.ForeignKey(
+        Team, related_name="games_won", on_delete=models.CASCADE, null=True, blank=True
+    )
     score1 = models.IntegerField(null=True, blank=True)
     score2 = models.IntegerField(null=True, blank=True)
     game_date = models.DateTimeField(null=True)
-    next_game = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
-    
+    next_game = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True
+    )
+
     def clean(self):
         if self.winner and self.winner not in [self.team1, self.team2]:
             raise ValidationError("Winner must be one of the teams playing in the game")
@@ -140,16 +162,19 @@ class Game(models.Model):
                 raise ValidationError("Winner must be team1 if team1's score is higher")
             if self.score2 > self.score1 and self.winner != self.team2:
                 raise ValidationError("Winner must be team2 if team2's score is higher")
-    
+
     def __str__(self):
         return f"Game {self.game_number}: {self.team1} vs {self.team2}"
-    
+
     class Meta:
-        ordering = ['tournament', 'round', 'game_number']
+        ordering = ["tournament", "round", "game_number"]
+
 
 class Prediction(models.Model):
-    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='predictions')
-    bracket = models.ForeignKey(Bracket, on_delete=models.CASCADE, related_name='predictions')
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="predictions")
+    bracket = models.ForeignKey(
+        Bracket, on_delete=models.CASCADE, related_name="predictions"
+    )
     predicted_winner = models.ForeignKey(Team, on_delete=models.CASCADE)
     is_correct = models.BooleanField(default=False)
     points_earned = models.IntegerField(default=0)
@@ -165,12 +190,14 @@ class Prediction(models.Model):
 
     def clean(self):
         if self.predicted_winner not in [self.game.team1, self.game.team2]:
-            raise ValidationError("Predicted winner must be one of the teams playing in the game")
+            raise ValidationError(
+                "Predicted winner must be one of the teams playing in the game"
+            )
 
     def __str__(self):
         return f"{self.bracket.user.username}'s prediction for {self.game}"
 
     class Meta:
-        app_label = 'bracket_iq'
-        unique_together = ('game', 'bracket')
-        ordering = ['game__round', 'game__game_number']
+        app_label = "bracket_iq"
+        unique_together = ("game", "bracket")
+        ordering = ["game__round", "game__game_number"]

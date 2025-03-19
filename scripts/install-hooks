@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Set script to exit immediately if a command fails
+set -e
+
+# Get the directory where the script is located
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+
+echo "Installing pre-commit hooks..."
+
+# Ensure hooks directory exists
+mkdir -p "$repo_root/.git/hooks"
+
+# Copy pre-commit hook
+cp "$repo_root/pre-commit" "$repo_root/.git/hooks/pre-commit"
+chmod +x "$repo_root/.git/hooks/pre-commit"
+
+echo "Installing development dependencies..."
+pip install -r "$repo_root/requirements-dev.txt"
+
+echo "Pre-commit hooks installed successfully!" 

@@ -239,3 +239,12 @@ bracket-iq/
 ├── requirements.txt   # Python dependencies
 └── LICENSE           # MIT License
 ```
+
+## Development Workflow
+
+For detailed information about our development workflow, including:
+- Setting up pre-commit hooks
+- Running tests and code quality checks
+- Continuous integration
+
+Please refer to the [Development Workflow](./development_workflow.md) documentation.
