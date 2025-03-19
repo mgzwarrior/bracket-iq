@@ -10,7 +10,12 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=1
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/bracket_iq
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=bracket_iq
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
       - DJANGO_SETTINGS_MODULE=bracket_iq.settings
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     depends_on:
