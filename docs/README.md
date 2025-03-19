@@ -167,6 +167,58 @@ python manage.py collectstatic
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and development process.
 
+## CI/CD and Iterative Development
+
+BracketIQ implements a GitHub Actions CI/CD pipeline to ensure code quality and facilitate iterative development.
+
+### GitHub Workflows
+
+We use GitHub Actions workflows to automatically run tests and checks:
+
+1. **Main Branch CI (`python-ci.yml`)**: Runs on push to the main branch
+   - Provides continuous integration for the main branch
+   - Runs all checks in a single job
+   - Generates and uploads coverage reports
+
+2. **Pull Request Checks (`pr-checks.yml`)**: Runs on pull requests to the main branch
+   - Provides detailed checks with separate jobs for better visibility:
+     - **Lint**: Code formatting and quality (Black, Flake8, Pylint, MyPy)
+     - **Test**: Django system checks and test suite with coverage
+     - **Build Check**: Validates that the Docker image builds successfully
+   - Enforces stricter validation (failures will block merging)
+
+### Iterative Development Process
+
+1. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make changes and commit (pre-commit checks will run automatically)
+
+3. Push your branch and create a PR:
+   ```bash
+   git push -u origin feature/your-feature-name
+   ```
+
+4. GitHub Actions will automatically run the PR checks workflow
+
+5. Address any issues raised by the checks
+
+6. Once all checks pass, your PR can be reviewed and merged
+
+### Pre-commit Hooks
+
+BracketIQ uses pre-commit hooks to catch issues before you commit. The hooks are set up in the `pre-commit` script and run the `./scripts/check` command.
+
+To ensure the hook is installed properly:
+
+```bash
+# Copy the pre-commit script to the .git/hooks directory
+cp pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
