@@ -9,15 +9,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NO_ENV_FILE: 'true'
+      DEV_DOCKER_WORKFLOW: 'none'
+      DB_ENGINE: django.db.backends.sqlite3
+      DB_NAME: bracket-iq-tests
+    
     strategy:
       matrix:
-        python-version: [3.9]
+        python-version: [3.10]
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Check out repository code
+      uses: actions/checkout@v4
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         
@@ -25,28 +32,27 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; else pip install -r requirements.txt; fi
+        pip install black flake8 pylint mypy django-stubs pytest coverage
         
     - name: Django system checks
       run: |
         python manage.py check
         
-    - name: Format with black
+    - name: Run code quality checks
       run: |
-        black bracket_iq
+        ./scripts/check
         
-    - name: Basic lint with flake8
+    - name: Run tests with coverage
       run: |
-        flake8 bracket_iq --count --select=E9,F63,F7,F82 --show-source --statistics
-    
-    # Temporarily disabling these checks until we've fixed all the issues    
-    # - name: Lint with pylint
-    #  run: |
-    #    pylint --rcfile=setup.cfg bracket_iq
+        ./scripts/test --coverage
         
-    # - name: Type check with mypy
-    #  run: |
-    #    mypy .
+    - name: Generate coverage report
+      run: |
+        ./scripts/test --report
         
-    # - name: Run tests
-    #  run: |
-    #    python manage.py test 
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: htmlcov/
+        retention-days: 7 
