@@ -18,7 +18,8 @@ function show_help {
     echo "  -f  --failfast      Stop tests after the first failure (--exitfirst)"
     echo "  -p  --parallel      Run tests in parallel"
     echo "  -c  --coverage      Run tests with coverage analysis"
-    echo "  -r  --report        Generate coverage report"
+    echo "  -r  --report        Generate coverage report in HTML format"
+    echo "  -x  --xml-report    Generate coverage report in XML format (for CI systems)"
     echo "  -h  --help          This help message"
     echo
     echo "Note: any additional arguments will be passed to pytest."
@@ -55,6 +56,11 @@ while [[ $# -gt 0 ]]; do
         -r|--report)
             PYTEST_ARGS+=" --cov=bracket_iq --cov-report=html"
             echo "Coverage report will be generated in htmlcov/"
+            shift
+            ;;
+        -x|--xml-report)
+            PYTEST_ARGS+=" --cov=bracket_iq --cov-report=xml"
+            echo "XML coverage report will be generated for CI systems"
             shift
             ;;
         -h|--help)
