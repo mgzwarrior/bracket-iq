@@ -4,24 +4,48 @@ source $script_base/tools
 cd $script_base/..
 
 echo "Running code formatting..."
-black bracket_iq
+if [ "$CHECK_ONLY" = "true" ]; then
+  black --check bracket_iq
+else
+  black bracket_iq
+fi
 
 echo "Running basic flake8 checks..."
-flake8 bracket_iq --count --select=E9,F63,F7,F82 --show-source --statistics
+if [ "$CHECK_ONLY" = "true" ]; then
+  # Use more comprehensive checks in CI mode
+  flake8 bracket_iq --count --show-source --statistics
+else
+  # Use more focused checks in development mode
+  flake8 bracket_iq --count --select=E9,F63,F7,F82 --show-source --statistics
+fi
 
 echo "Running pylint checks..."
 if ! command -v pylint &> /dev/null; then
     echo "Installing pylint..."
     pip install pylint
 fi
-pylint --rcfile=setup.cfg bracket_iq || echo "Pylint found issues but continuing..."
+
+if [ "$CHECK_ONLY" = "true" ]; then
+  # In CI mode, fail if pylint finds issues
+  pylint --rcfile=setup.cfg bracket_iq
+else
+  # In development mode, continue even if pylint finds issues
+  pylint --rcfile=setup.cfg bracket_iq || echo "Pylint found issues but continuing..."
+fi
 
 echo "Running type checking with mypy..."
 if ! command -v mypy &> /dev/null; then
     echo "Installing mypy and django-stubs..."
     pip install mypy django-stubs
 fi
-mypy bracket_iq || echo "MyPy found issues but continuing..."
+
+if [ "$CHECK_ONLY" = "true" ]; then
+  # In CI mode, fail if mypy finds issues
+  mypy bracket_iq
+else
+  # In development mode, continue even if mypy finds issues
+  mypy bracket_iq || echo "MyPy found issues but continuing..."
+fi
 
 echo "All checks completed."
 exit 0 

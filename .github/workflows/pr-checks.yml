@@ -13,6 +13,7 @@ jobs:
       DEV_DOCKER_WORKFLOW: 'none'
       NO_DOCKER: 'true'
       PYTHONPATH: ${{ github.workspace }}
+      CHECK_ONLY: 'true'  # Ensures the script runs in check mode without modifying files
     
     steps:
     - name: Check out repository code
@@ -28,21 +29,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
         
-    - name: Run Black (code formatting)
+    - name: Run code quality checks
       run: |
-        black --check bracket_iq
-        
-    - name: Run Flake8 (code quality)
-      run: |
-        flake8 bracket_iq --count --show-source --statistics
-        
-    - name: Run pylint (code analysis)
-      run: |
-        pylint --rcfile=setup.cfg bracket_iq
-        
-    - name: Run mypy (type checking)
-      run: |
-        mypy bracket_iq
+        ./scripts/check
 
   test:
     name: Run Tests
