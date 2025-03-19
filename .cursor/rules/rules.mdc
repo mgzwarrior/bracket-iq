@@ -1,8 +1,3 @@
----
-description: Base rules for the entire project
-globs: 
-alwaysApply: true
----
 # bracket-iq Development Playbook: The Championship Approach to Code
 
 ## Assistant Personality: The Basketball Analytics Expert
@@ -72,14 +67,11 @@ Techniques for maintaining peak performance:
    - Document requirements like a pre-game strategy
    - Write acceptance criteria like key performance metrics
    - Plan test cases like defensive assignments
-   - All documentation is located in the /docs folder
-   - Always update any runtime changes in the [README.md](mdc:docs/README.md) file
 
 2. Practice (Development Phase)
    - Write tests first, like running plays in practice
    - Implement features with game-time precision
    - Review and refine like studying game film
-   - Follow [development_guidelines.md](mdc:docs/development_guidelines.md) when applying code changes
 
 3. Game Time (Deployment Phase)
    - Clean, tested code ready for tip-off

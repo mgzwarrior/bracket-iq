@@ -1,0 +1,93 @@
+#!/bin/bash
+set -e
+script_base=$(dirname "$0")
+source $script_base/tools
+cd $script_base/..
+
+# Default test options
+test_cmd="./manage.py test"
+flags="--settings=bracket_iq.settings.test"  # Use the test settings
+test_args=""
+
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -v|--verbose)
+            flags+=" --verbosity=2"
+            ;;
+        -k|--keep-db)
+            flags+=" --keepdb"
+            ;;
+        -f|--failfast)
+            flags+=" --failfast"
+            ;;
+        -p|--parallel)
+            flags+=" --parallel"
+            ;;
+        -c|--coverage)
+            test_cmd="coverage run --source=bracket_iq"
+            test_args="./manage.py test"
+            ;;
+        -r|--report)
+            coverage report
+            coverage html
+            echo "Coverage report generated in htmlcov/"
+            exit 0
+            ;;
+        -h|--help)
+            echo "Run unit tests."
+            echo
+            echo "Usage: $(basename $0) <options> [<TEST_PATH>]"
+            echo
+            echo "Options:"
+            echo "  -v  --verbose       Run tests with more verbose output"
+            echo "  -k  --keep-db       Keep the test database between runs"
+            echo "  -f  --failfast      Stop tests after the first failure"
+            echo "  -p  --parallel      Run tests in parallel"
+            echo "  -c  --coverage      Run tests with coverage analysis"
+            echo "  -r  --report        Generate coverage report (run after -c)"
+            echo "  -h  --help          This help message"
+            echo
+            echo "Note: any additional arguments will be passed to the test runner."
+            exit 0
+            ;;
+        *)
+            POSITIONAL+=("$key")
+            ;;
+    esac
+    shift
+done
+set -- "${POSITIONAL[@]}"
+
+# Load environment
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+# Set test database to SQLite for simplified testing
+export TEST_DB_ENGINE="sqlite3"
+
+# Check if we're in a virtual environment, activate if not
+if [[ -z "${VIRTUAL_ENV}" ]]; then
+    if [ -d "venv" ]; then
+        source venv/bin/activate
+    fi
+fi
+
+# Ensure coverage is installed if needed
+if [[ "$test_cmd" == "coverage"* ]]; then
+    if ! command -v coverage &> /dev/null; then
+        echo "Installing coverage..."
+        pip install coverage
+    fi
+fi
+
+# Run tests
+if [[ -n "$test_args" ]]; then
+    $test_cmd $test_args $flags "$@"
+else
+    $test_cmd $flags "$@"
+fi 
