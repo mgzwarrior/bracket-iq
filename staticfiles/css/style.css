@@ -24,6 +24,24 @@ nav {
     box-shadow: var(--box-shadow);
 }
 
+.nav-links {
+    display: flex;
+    align-items: center;
+}
+
+.nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+nav .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 2rem;
+}
+
 nav a {
     color: white;
     text-decoration: none;
@@ -34,6 +52,53 @@ nav a {
 
 nav a:hover {
     color: var(--primary-color);
+}
+
+/* Navigation buttons */
+.nav-button {
+    background-color: var(--primary-color);
+    color: white !important;
+    padding: 8px 16px !important;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    transition: background-color 0.2s ease;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+    white-space: nowrap;
+    margin: 0;
+}
+
+.nav-button:hover {
+    background-color: #E65C00;
+    color: white !important;
+    text-decoration: none;
+}
+
+.logout-button {
+    background-color: #6c757d !important;
+}
+
+.logout-button:hover {
+    background-color: #5a6268 !important;
+}
+
+.admin-button {
+    background-color: #dc3545 !important;
+}
+
+.admin-button:hover {
+    background-color: #c82333 !important;
+}
+
+/* Reset button styles to match links */
+button.nav-button {
+    font-family: inherit;
+    outline: none;
 }
 
 /* Container */

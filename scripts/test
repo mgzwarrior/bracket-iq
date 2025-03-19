@@ -5,99 +5,117 @@ source $script_base/tools
 cd $script_base/..
 
 # Default test options
-test_cmd="python -m pytest"
-flags="--ds=bracket_iq.settings.test"  # Django settings module for pytest-django
-test_args=""
+PYTEST_ARGS=""
 
+function show_help {
+    echo "Run unit tests with pytest (in Docker if available)."
+    echo
+    echo "Usage: $(basename $0) <options> [<TEST_PATH>]"
+    echo
+    echo "Options:"
+    echo "  -v  --verbose       Run tests with more verbose output"
+    echo "  -k  --keep-db       Keep the test database between runs (--reuse-db)"
+    echo "  -f  --failfast      Stop tests after the first failure (--exitfirst)"
+    echo "  -p  --parallel      Run tests in parallel"
+    echo "  -c  --coverage      Run tests with coverage analysis"
+    echo "  -r  --report        Generate coverage report"
+    echo "  -h  --help          This help message"
+    echo
+    echo "Note: any additional arguments will be passed to pytest."
+    exit 0
+}
+
+# Test arguments to collect
 POSITIONAL=()
+
+# Process command line arguments
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
         -v|--verbose)
-            flags+=" -v"
+            PYTEST_ARGS+=" -v"
+            shift
             ;;
         -k|--keep-db)
-            flags+=" --reuse-db"
+            PYTEST_ARGS+=" --reuse-db"
+            shift
             ;;
         -f|--failfast)
-            flags+=" --exitfirst"
+            PYTEST_ARGS+=" --exitfirst"
+            shift
             ;;
         -p|--parallel)
-            flags+=" -xvs"  # Run tests in parallel with pytest-xdist
+            PYTEST_ARGS+=" -xvs"
+            shift
             ;;
         -c|--coverage)
-            flags+=" --cov=bracket_iq"
+            PYTEST_ARGS+=" --cov=bracket_iq"
+            shift
             ;;
         -r|--report)
-            flags+=" --cov=bracket_iq --cov-report=html"
+            PYTEST_ARGS+=" --cov=bracket_iq --cov-report=html"
             echo "Coverage report will be generated in htmlcov/"
+            shift
             ;;
         -h|--help)
-            echo "Run unit tests with pytest."
-            echo
-            echo "Usage: $(basename $0) <options> [<TEST_PATH>]"
-            echo
-            echo "Options:"
-            echo "  -v  --verbose       Run tests with more verbose output"
-            echo "  -k  --keep-db       Keep the test database between runs (--reuse-db)"
-            echo "  -f  --failfast      Stop tests after the first failure (--exitfirst)"
-            echo "  -p  --parallel      Run tests in parallel"
-            echo "  -c  --coverage      Run tests with coverage analysis"
-            echo "  -r  --report        Generate coverage report"
-            echo "  -h  --help          This help message"
-            echo
-            echo "Note: any additional arguments will be passed to pytest."
-            exit 0
+            show_help
+            shift
             ;;
         *)
-            POSITIONAL+=("$key")
+            # Collect all other arguments to pass directly to pytest
+            POSITIONAL+=("$1")
+            shift
             ;;
     esac
-    shift
 done
-set -- "${POSITIONAL[@]}"
 
-# Load environment
+# Load environment variables
 if [ -f .env ]; then
     set -a
     source .env
     set +a
 fi
 
-# Set test database to SQLite for simplified testing
-export TEST_DB_ENGINE="sqlite3"
-
-# Check if we're in a virtual environment, activate if not
-if [[ -z "${VIRTUAL_ENV}" ]]; then
-    if [ -d "venv" ]; then
-        source venv/bin/activate
-    elif [ -d "venv_py3.13" ]; then
-        source venv_py3.13/bin/activate
+# Function to check if Docker is available
+can_run_docker() {
+    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+        return 0  # Docker is available
     fi
-fi
+    return 1  # Docker is not available
+}
 
-# Ensure required packages are installed
-echo "Checking requirements for pytest testing..."
-pip install -q pytest pytest-django pytest-cov pytest-xdist
-
-# Create pytest.ini if it doesn't exist
-if [ ! -f pytest.ini ]; then
-    echo "Creating pytest.ini configuration file..."
-    cat > pytest.ini << EOF
-[pytest]
-DJANGO_SETTINGS_MODULE = bracket_iq.settings.test
-python_files = test_*.py
-testpaths = bracket_iq
-python_classes = *Tests
-filterwarnings =
-    ignore::DeprecationWarning
-    ignore::PendingDeprecationWarning
-EOF
-fi
-
-# Run tests
-if [[ -n "$*" ]]; then
-    $test_cmd $flags "$@"
+# Set up testing environment
+if can_run_docker; then
+    echo "Running tests in Docker container..."
+    
+    # Ensure pytest and related packages are installed in the container
+    docker-compose run --rm web pip install -q pytest pytest-django pytest-cov pytest-xdist
+    
+    # Set up runner for Docker
+    runner="docker-compose run --rm -e DJANGO_SETTINGS_MODULE=bracket_iq.settings.test -e PYTHONPATH=/app web"
 else
-    $test_cmd $flags bracket_iq/
+    echo "Docker not available. Running tests locally..."
+    # Check if we're in a virtual environment, activate if not
+    if [[ -z "${VIRTUAL_ENV}" ]]; then
+        if [ -d "venv" ]; then
+            source venv/bin/activate
+        elif [ -d "venv_py3.13" ]; then
+            source venv_py3.13/bin/activate
+        fi
+    fi
+    
+    # Install required packages locally if needed
+    pip install -q pytest pytest-django pytest-cov pytest-xdist --no-warn-script-location
+    
+    # Set environment for local execution
+    export DJANGO_SETTINGS_MODULE=bracket_iq.settings.test
+    export PYTHONPATH=$(pwd)
+    runner=""
+fi
+
+# Run the tests using pytest with any additional arguments
+if [ ${#POSITIONAL[@]} -eq 0 ]; then
+    $runner pytest $PYTEST_ARGS bracket_iq/
+else
+    $runner pytest $PYTEST_ARGS "${POSITIONAL[@]}" 
 fi 

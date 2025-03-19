@@ -86,6 +86,7 @@ Start the development server:
 The `scripts` directory contains helpful tools for development:
 
 - `./scripts/setup`: Set up your development environment
+  - Automatically creates a superuser with username `appuser` and password `testpass123`
 - `./scripts/manage`: Run Django management commands
 - `./scripts/test`: Run tests
 - `./scripts/lint`: Run linting checks
@@ -93,6 +94,43 @@ The `scripts` directory contains helpful tools for development:
 - `./scripts/dbshell`: Open a database shell
 - `./scripts/start`: Start all services (Docker mode)
 - `./scripts/stop`: Stop all services (Docker mode)
+- `./scripts/cleanup`: Clean up build files, caches and Docker artifacts
+- `./scripts/teardown`: Completely tear down the Docker environment and delete all related data
+
+### Environment Management
+
+To reset your development environment:
+
+#### Cleanup (Recommended for regular use)
+
+The cleanup script removes cache files and unnecessary Docker artifacts without completely resetting your database:
+
+```bash
+./scripts/cleanup
+```
+
+Use the `-y` flag to skip confirmation prompts:
+```bash
+./scripts/cleanup -y
+```
+
+#### Complete Teardown
+
+For a complete reset that removes all containers, volumes, and data:
+
+```bash
+./scripts/teardown
+```
+
+Use the `-f` flag to force teardown or `-y` to skip confirmation prompts:
+```bash
+./scripts/teardown -f -y
+```
+
+After teardown, you'll need to run the setup script again to recreate your environment:
+```bash
+./scripts/setup
+```
 
 ## Common Setup Issues
 

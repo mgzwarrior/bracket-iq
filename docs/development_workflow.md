@@ -151,4 +151,63 @@ To install all development dependencies:
 
 ```bash
 pip install -r requirements-dev.txt
-``` 
+```
+
+## Environment Management
+
+The project includes scripts for managing your development environment:
+
+### Setup
+
+The setup script configures your development environment:
+
+```bash
+# Docker development (recommended)
+./scripts/setup
+
+# Local development
+./scripts/setup -l
+```
+
+The setup script automatically creates a superuser with the following credentials:
+- Username: `appuser`
+- Password: `testpass123`
+
+### Cleanup
+
+For regular maintenance, use the cleanup script to remove cached files and unnecessary Docker artifacts:
+
+```bash
+./scripts/cleanup
+```
+
+This is useful for:
+- Clearing Python cache files (`.pyc`, `__pycache__`, etc.)
+- Removing test artifacts (`.pytest_cache`, `.coverage`, etc.)
+- Pruning Docker's system cache (stopped containers, dangling images)
+
+Use the `-y` flag to skip confirmation prompts:
+```bash
+./scripts/cleanup -y
+```
+
+### Complete Teardown
+
+If you need to completely reset your development environment, use the teardown script:
+
+```bash
+./scripts/teardown
+```
+
+This performs a thorough cleaning by:
+- Shutting down all Docker containers
+- Removing all related containers, images, and networks
+- Deleting all volumes containing database data
+- Pruning the Docker system
+
+Use the `-f` flag to force teardown or `-y` to skip confirmation prompts:
+```bash
+./scripts/teardown -f -y
+```
+
+After a teardown, you'll need to run the setup script again to recreate your environment. 

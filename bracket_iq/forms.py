@@ -1,8 +1,9 @@
 # backend/backend/forms.py
 from django import forms
-from .models import Team, Tournament, Game, Bracket, Prediction
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+
+from .models import Team, Game, Bracket, Prediction
 
 
 class GameForm(forms.ModelForm):

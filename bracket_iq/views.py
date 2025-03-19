@@ -1,26 +1,17 @@
 # views.py
 import datetime
-
-import random
-from itertools import combinations
+from typing import Dict, List, Any
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.http import JsonResponse
-from django.core.exceptions import ValidationError
-from django.db.models import Q
-from django.utils import timezone
-from django.contrib.auth.models import User
 from django.core.paginator import Paginator
-from django.urls import reverse
 
-from .forms import GameForm, BracketForm, PredictionForm
+from .forms import GameForm, CustomUserCreationForm
 from .models import Team, Game, Bracket, Prediction, Round, Tournament
-from .forms import CustomUserCreationForm
 
 
 @login_required(login_url="login")
@@ -81,8 +72,8 @@ def create_bracket_form(request):
         tournament_id = request.POST.get("tournament")
         if tournament_id:
             return redirect("create_bracket", tournament_id=tournament_id)
-        else:
-            messages.error(request, "Please select a tournament.")
+
+        messages.error(request, "Please select a tournament.")
 
     # Get all active tournaments for the form
     tournaments = Tournament.objects.all().order_by("-year")
@@ -97,9 +88,15 @@ def create_live_bracket(request, game_number=1):
         form = GameForm(request.POST)
         if form.is_valid():
             # Get or create a Bracket object for the current user
-            bracket, created = Bracket.objects.get_or_create(user=request.user)
-            if game_number >= 1 and game_number < 5:
-                round = Round.FIRST_FOUR.value
+            bracket, _ = Bracket.objects.get_or_create(user=request.user)
+
+            # Determine round based on game number
+            round_value = (
+                Round.FIRST_FOUR.value
+                if 1 <= game_number < 5
+                else Round.ROUND_OF_64.value
+            )
+
             # Create a new game
             Game.objects.create(
                 seed1=form.cleaned_data["seed1"],
@@ -108,14 +105,14 @@ def create_live_bracket(request, game_number=1):
                 team2=form.cleaned_data["team2"],
                 game_number=game_number,
                 bracket=bracket,
-                round=round,
+                round=round_value,
                 year=datetime.date.today().year,
             )
             # Redirect to the next game creation page or the completed bracket page
             if game_number < 68:
                 return redirect("create_live_bracket", game_number=game_number + 1)
-            else:
-                return redirect("display_bracket")
+
+            return redirect("display_bracket")
     else:
         form = GameForm()
 
@@ -126,27 +123,46 @@ def create_live_bracket(request, game_number=1):
 
 @login_required
 def display_bracket(request, bracket_id):
-    bracket = get_object_or_404(Bracket, id=bracket_id)
-    predictions = Prediction.objects.filter(bracket=bracket).select_related("game")
+    # Get the bracket or return 404
+    bracket = get_object_or_404(Bracket, pk=bracket_id)
 
-    # Group predictions by round
-    predictions_by_round = {}
-    for prediction in predictions:
-        round_num = prediction.game.round
-        if round_num not in predictions_by_round:
-            predictions_by_round[round_num] = []
-        predictions_by_round[round_num].append(prediction)
+    # Get all games and predictions for this bracket
+    games = Game.objects.filter(tournament=bracket.tournament).order_by(
+        "round", "game_number"
+    )
 
-    # Sort predictions within each round by game number
-    for round_num in predictions_by_round:
-        predictions_by_round[round_num].sort(key=lambda p: p.game.game_number)
+    # Organize predictions by round for easier rendering
+    predictions_by_round: Dict[int, List[Dict[str, Any]]] = {}
+
+    for game in games:
+        round_value = game.round
+        if round_value not in predictions_by_round:
+            predictions_by_round[round_value] = []
+
+        # Find or create prediction
+        prediction, _ = Prediction.objects.get_or_create(
+            bracket=bracket,
+            game=game,
+            defaults={"predicted_winner": game.team1},
+        )
+
+        predictions_by_round[round_value].append(
+            {"game": game, "prediction": prediction}
+        )
+
+    for round_value, predictions in predictions_by_round.items():
+        # Sort games by game number
+        predictions_by_round[round_value] = sorted(
+            predictions, key=lambda p: p["game"].game_number
+        )
 
     context = {
         "bracket": bracket,
         "predictions_by_round": predictions_by_round,
-        "rounds": Round,
+        "round_names": {r.value: r.label for r in Round},
     }
-    return render(request, "display_bracket.html", context)
+
+    return render(request, "bracket_iq/display_bracket.html", context)
 
 
 @login_required
@@ -269,62 +285,40 @@ def view_bracket(request, bracket_id):
 
 
 @login_required
-def seed_tournament(request):
-    """View for seeding a new tournament through the web interface."""
-    if not request.user.is_staff:
-        messages.error(request, "You must be an admin to seed tournaments.")
-        return redirect("home")
-
-    if request.method == "POST":
-        year = request.POST.get("year")
-        if not year:
-            messages.error(request, "Year is required.")
-            return redirect("seed_tournament")
-
-        try:
-            # Clear existing data
-            with transaction.atomic():
-                Tournament.objects.filter(year=year).delete()
-
-                # Run the seeding command
-                from django.core.management import call_command
-
-                call_command("seed_teams")
-                call_command("seed_tournament_2025")
-
-                messages.success(request, f"Successfully seeded {year} tournament.")
-                return redirect("admin:bracket_iq_tournament_changelist")
-        except Exception as e:
-            messages.error(request, f"Error seeding tournament: {str(e)}")
-            return redirect("seed_tournament")
-
-    # GET request - show the form
-    current_year = datetime.datetime.now().year
-    years = range(
-        current_year, current_year + 5
-    )  # Allow seeding up to 5 years in advance
-    return render(request, "admin/seed_tournament.html", {"years": years})
-
-
-@login_required
 @require_POST
 def update_prediction(request, prediction_id):
-    prediction = get_object_or_404(Prediction, id=prediction_id)
-    if prediction.bracket.user != request.user:
-        return JsonResponse({"error": "Permission denied"}, status=403)
+    # Get the prediction
+    prediction = get_object_or_404(Prediction, pk=prediction_id)
 
-    form = PredictionForm(request.POST, instance=prediction)
-    if form.is_valid():
-        form.save()
+    # Get the game and new predicted winner
+    game_id = request.POST.get("game")
+    winner_id = request.POST.get("winner")
+
+    if not game_id or not winner_id:
+        return JsonResponse({"success": False, "error": "Missing game or winner ID"})
+
+    # Update the prediction
+    try:
+        game = Game.objects.get(pk=game_id)
+        winner = Team.objects.get(pk=winner_id)
+
+        # Verify this is a valid choice
+        if winner not in [game.team1, game.team2]:
+            return JsonResponse({"success": False, "error": "Invalid winner selection"})
+
+        prediction.predicted_winner = winner
+        prediction.save()
+
         return JsonResponse({"success": True})
-    return JsonResponse({"error": form.errors}, status=400)
+    except (Game.DoesNotExist, Team.DoesNotExist):
+        return JsonResponse({"success": False, "error": "Game or Team not found"})
 
 
 def list_brackets(request):
-    brackets = Bracket.objects.all().order_by("-created_at")
-    paginator = Paginator(brackets, 10)  # Show 10 brackets per page
+    query_brackets = Bracket.objects.all().order_by("-created_at")
+    paginator = Paginator(query_brackets, 10)  # Show 10 brackets per page
 
     page = request.GET.get("page")
-    brackets = paginator.get_page(page)
+    page_obj = paginator.get_page(page)
 
-    return render(request, "list_brackets.html", {"brackets": brackets})
+    return render(request, "list_brackets.html", {"brackets": page_obj})
