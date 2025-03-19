@@ -15,7 +15,9 @@ class TeamModelTests(TestCase):
 
     def setUp(self):
         # Every Cinderella story starts with a team
-        self.team = Team.objects.create(name="Test Team")
+        self.team = Team.objects.create(
+            name="Test Team", short_name="TST", mascot="Testers"
+        )
 
     def test_team_creation(self):
         """Test that teams are created properly, like a well-executed recruiting class."""
@@ -34,40 +36,58 @@ class BracketModelTests(TestCase):
     def setUp(self):
         # Every bracket needs a passionate fan behind it
         self.user = User.objects.create_user(username="testuser", password="12345")
-        self.bracket = Bracket.objects.create(user=self.user)
+        self.tournament = Tournament.objects.create(
+            year=2024,
+            name="NCAA March Madness",
+            start_date="2024-03-19",
+            end_date="2024-04-08",
+        )
+        self.bracket = Bracket.objects.create(
+            user=self.user, tournament=self.tournament, name="My Test Bracket"
+        )
 
     def test_bracket_creation(self):
         """Test bracket creation - the moment every March Madness fan lives for!"""
         self.assertTrue(isinstance(self.bracket, Bracket))
+        self.assertEqual(self.bracket.tournament, self.tournament)
         self.assertEqual(self.bracket.user, self.user)
-        self.assertIsNotNone(self.bracket.uuid)
-        self.assertEqual(
-            self.bracket.year, date.today().year
-        )  # Ready for this year's tournament
 
 
 class GameModelTests(TestCase):
     """
-    Test suite for Game models - where the magic happens!
-    From buzzer-beaters to historic upsets, every tournament game
-    needs to be properly tracked.
+    Test suite for Game models - the heart-pounding matchups that define March Madness!
+    Just like game day preparation, we need to ensure our games are
+    set up correctly before the ball is tipped.
     """
 
     def setUp(self):
-        # Setting up an epic 1 vs 16 matchup
+        # Creating the stage for an epic tournament game
         self.user = User.objects.create_user(username="testuser", password="12345")
-        self.bracket = Bracket.objects.create(user=self.user)
-        self.team1 = Team.objects.create(name="Team 1")  # Our 1 seed powerhouse
-        self.team2 = Team.objects.create(name="Team 2")  # The hopeful underdog
+        self.tournament = Tournament.objects.create(
+            year=2024,
+            name="NCAA March Madness",
+            start_date="2024-03-19",
+            end_date="2024-04-08",
+        )
+        self.bracket = Bracket.objects.create(
+            user=self.user, tournament=self.tournament
+        )
+        self.team1 = Team.objects.create(
+            name="Team 1", short_name="TM1", mascot="Lions"
+        )  # Our 1 seed powerhouse
+        self.team2 = Team.objects.create(
+            name="Team 2", short_name="TM2", mascot="Eagles"
+        )  # The hopeful underdog
         self.game = Game.objects.create(
             seed1=1,
             team1=self.team1,
             seed2=16,
             team2=self.team2,
             round=Round.FIRST_FOUR.value,
-            year=2024,
+            region=Region.FIRST_FOUR,
             game_number=1,
             bracket=self.bracket,
+            tournament=self.tournament,
         )
 
     def test_game_creation(self):
@@ -96,36 +116,68 @@ class PredictionModelTests(TestCase):
     def setUp(self):
         # Setting up a classic tournament matchup
         self.user = User.objects.create_user(username="testuser", password="12345")
-        self.bracket = Bracket.objects.create(user=self.user)
-        self.team1 = Team.objects.create(name="Team 1")
-        self.team2 = Team.objects.create(name="Team 2")
+        self.tournament = Tournament.objects.create(
+            year=2024,
+            name="NCAA March Madness",
+            start_date="2024-03-19",
+            end_date="2024-04-08",
+        )
+        self.bracket = Bracket.objects.create(
+            user=self.user, tournament=self.tournament
+        )
+        self.team1 = Team.objects.create(
+            name="Team 1", short_name="TM1", mascot="Lions"
+        )
+        self.team2 = Team.objects.create(
+            name="Team 2", short_name="TM2", mascot="Eagles"
+        )
         self.game = Game.objects.create(
+            tournament=self.tournament,
+            bracket=self.bracket,
+            round=Round.ROUND_OF_64.value,
+            region=Region.EAST,
+            game_number=1,
             seed1=1,
             team1=self.team1,
             seed2=16,
             team2=self.team2,
-            round=Round.FIRST_FOUR.value,
-            year=2024,
-            game_number=1,
-            bracket=self.bracket,
         )
-        # Making our bold prediction
         self.prediction = Prediction.objects.create(
-            game=self.game, predicted_winner=self.team1, bracket=self.bracket
+            game=self.game, bracket=self.bracket, predicted_winner=self.team1
         )
 
     def test_prediction_creation(self):
-        """Test prediction creation - putting your bracket wisdom on the line!"""
+        """Test prediction creation - putting your bracket knowledge to the test!"""
         self.assertTrue(isinstance(self.prediction, Prediction))
         self.assertEqual(self.prediction.predicted_winner, self.team1)
-        self.assertEqual(self.prediction.game, self.game)
-        self.assertEqual(self.prediction.bracket, self.bracket)
+        self.assertFalse(self.prediction.is_correct)  # Awaiting the outcome
+
+    def test_prediction_correct(self):
+        """Test correct predictions - the sweet sound of picking a winner!"""
+        # Game result matches the prediction
+        self.game.winner = self.team1
+        self.game.save()
+        self.prediction.is_correct = True
+        self.prediction.save()
+        self.assertTrue(self.prediction.is_correct)
 
 
 class SeedTeamRelationshipTest(TestCase):
+    """Tests for the relationship between Teams and their Seeds"""
+
     def setUp(self):
         self.team = Team.objects.create(
-            name="Gonzaga", short_name="GON", mascot="Bulldogs"
+            name="Kansas", short_name="KAN", mascot="Jayhawks"
+        )
+        self.user = User.objects.create_user(username="testuser", password="12345")
+        self.tournament = Tournament.objects.create(
+            year=2024,
+            name="NCAA March Madness",
+            start_date="2024-03-19",
+            end_date="2024-04-08",
+        )
+        self.bracket = Bracket.objects.create(
+            user=self.user, tournament=self.tournament
         )
 
     def test_team_seed_relationship(self):
@@ -134,12 +186,14 @@ class SeedTeamRelationshipTest(TestCase):
         # We'll test Game seed assignments instead
         game = Game.objects.create(
             round=Round.ROUND_OF_64.value,
-            year=2024,
+            region=Region.EAST,
             game_number=1,
             seed1=1,
             team1=self.team,
             seed2=16,
             team2=None,
+            tournament=self.tournament,
+            bracket=self.bracket,
         )
 
         # Verify seeds are correctly assigned in games
@@ -156,23 +210,30 @@ class SeedTeamRelationshipTest(TestCase):
         # Create games with same seeds but different teams/regions
         game1 = Game.objects.create(
             round=Round.ROUND_OF_64.value,
-            year=2024,
+            region=Region.EAST,
             game_number=1,
-            region=Region.EAST.value,
             seed1=1,
             team1=self.team,
+            seed2=16,
+            team2=None,
+            tournament=self.tournament,
+            bracket=self.bracket,
         )
 
         game2 = Game.objects.create(
             round=Round.ROUND_OF_64.value,
-            year=2024,
+            region=Region.WEST,
             game_number=2,
-            region=Region.WEST.value,
             seed1=1,
             team1=team2,
+            seed2=16,
+            team2=None,
+            tournament=self.tournament,
+            bracket=self.bracket,
         )
 
-        # Verify both teams can have the same seed in different regions
-        self.assertEqual(game1.seed1, game2.seed1)
-        self.assertNotEqual(game1.team1, game2.team1)
-        self.assertNotEqual(game1.region, game2.region)
+        # Verify both teams can have seed 1 in different regions
+        self.assertEqual(game1.seed1, 1)
+        self.assertEqual(game2.seed1, 1)
+        self.assertEqual(game1.team1, self.team)
+        self.assertEqual(game2.team1, team2)

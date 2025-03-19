@@ -23,7 +23,7 @@ class BracketIQAdminSite(AdminSite):
         urls = super().get_urls()
         custom_urls = [
             path(
-                "tournament/seed/",
+                "seed_tournament/",
                 self.admin_view(self.seed_tournament_view),
                 name="seed_tournament",
             ),
@@ -31,67 +31,61 @@ class BracketIQAdminSite(AdminSite):
         return custom_urls + urls
 
     def seed_tournament_view(self, request):
-        if request.method == "POST":
-            year = request.POST.get("year")
-            if not year:
-                messages.error(request, "Year is required.")
-                return redirect("admin:seed_tournament")
-
-            try:
-                # First transaction: Clean up existing data
-                with transaction.atomic():
-                    # Delete the tournaments for the given year
-                    Tournament.objects.filter(year=year).delete()
-
-                    # Clean up duplicate teams
-                    team_names = Team.objects.values_list("name", flat=True).distinct()
-                    for team_name in team_names:
-                        teams = Team.objects.filter(name=team_name).order_by("id")
-                        if teams.count() > 1:
-                            # Keep the first one, delete the rest
-                            first_team = teams.first()
-                            Team.objects.filter(name=team_name).exclude(
-                                id=first_team.id
-                            ).delete()
-
-                # Second transaction: Run seeding commands
-                with transaction.atomic():
-                    # Run the seeding commands
-                    call_command("seed_teams")
-                    call_command(f"seed_tournament_{year}")
-
-                messages.success(request, f"Successfully seeded {year} tournament.")
-                return redirect("admin:bracket_iq_tournament_changelist")
-            except Exception as e:
-                messages.error(request, f"Error seeding tournament: {str(e)}")
-                return redirect("admin:seed_tournament")
-
-        # GET request - show the form
-        # Find all available tournament seeding scripts
-        available_years = []
-        commands_dir = os.path.join(
-            settings.BASE_DIR, "bracket_iq", "management", "commands"
-        )
-
-        if os.path.exists(commands_dir):
-            for filename in os.listdir(commands_dir):
-                if filename.endswith(".py"):
-                    match = re.match(r"seed_tournament_(\d{4})\.py", filename)
-                    if match:
-                        available_years.append(int(match.group(1)))
-
-        available_years.sort(reverse=True)  # Show most recent years first
-
-        if not available_years:
-            messages.warning(request, "No tournament seeding scripts found.")
-            return redirect("admin:index")
-
         context = {
             **self.each_context(request),
             "title": "Seed Tournament",
-            "years": available_years,
         }
-        return TemplateResponse(request, "admin/seed_tournament.html", context)
+
+        if request.method == "POST":
+            year = request.POST.get("year")
+            generate_games = request.POST.get("generate_games") == "on"
+
+            try:
+                with transaction.atomic():
+                    # Check if tournament already exists
+                    if Tournament.objects.filter(year=year).exists():
+                        tournament = Tournament.objects.get(year=year)
+                        messages.warning(
+                            request,
+                            f"Tournament for {year} already exists. Using existing tournament.",
+                        )
+                    else:
+                        # Create a new tournament
+                        start_date = f"{year}-03-19"  # Default start date
+                        end_date = f"{year}-04-08"  # Default end date
+                        tournament = Tournament.objects.create(
+                            year=year,
+                            name=f"NCAA March Madness {year}",
+                            start_date=start_date,
+                            end_date=end_date,
+                        )
+                        messages.success(
+                            request, f"Tournament for {year} created successfully."
+                        )
+
+                    # Run the management command to seed teams
+                    call_command("seed_teams")
+                    messages.success(request, "Teams seeded successfully.")
+
+                    if generate_games:
+                        # Run the management command to generate tournament games
+                        call_command("generate_tournament_games", year=year)
+                        messages.success(
+                            request,
+                            f"Games for {year} tournament generated successfully.",
+                        )
+
+                return redirect("admin:index")
+
+            except Exception as e:
+                messages.error(request, f"Error: {str(e)}")
+                return TemplateResponse(
+                    request, "admin/bracketiq_admin/seed_tournament.html", context
+                )
+
+        return TemplateResponse(
+            request, "admin/bracketiq_admin/seed_tournament.html", context
+        )
 
 
 class GameInline(admin.TabularInline):
@@ -117,15 +111,12 @@ class TournamentAdmin(admin.ModelAdmin):
     inlines = [GameInline]
 
     def games_completed(self, obj):
-        total_games = obj.game_set.count()
-        completed_games = obj.game_set.exclude(winner=None).count()
-        return format_html(
-            '<span style="color: {};">{}/{} ({}%)</span>',
-            "green" if total_games == completed_games else "orange",
-            completed_games,
-            total_games,
-            int((completed_games / total_games) * 100) if total_games > 0 else 0,
-        )
+        """Display how many games have been completed in this tournament."""
+        total_games = Game.objects.filter(tournament=obj).count()
+        completed_games = Game.objects.filter(
+            tournament=obj, winner__isnull=False
+        ).count()
+        return f"{completed_games}/{total_games}"
 
     games_completed.short_description = "Games Completed"
 
@@ -147,43 +138,49 @@ class GameAdmin(admin.ModelAdmin):
     readonly_fields = ("game_number",)
 
     def matchup(self, obj):
-        return f"{obj.team1.name if obj.team1 else 'TBD'} vs {obj.team2.name if obj.team2 else 'TBD'}"
+        if obj.team1 and obj.team2:
+            return f"({obj.seed1}) {obj.team1.name} vs ({obj.seed2}) {obj.team2.name}"
+        return "TBD"
 
     def score_display(self, obj):
         if obj.score1 is not None and obj.score2 is not None:
             return f"{obj.score1} - {obj.score2}"
-        return "Not Played"
+        return "TBD"
 
     score_display.short_description = "Score"
+    score_display.admin_order_field = "score1"
 
     def winner_display(self, obj):
-        if not obj.winner:
-            return format_html('<span style="color: orange;">Pending</span>')
-        return format_html('<span style="color: green;">{}</span>', obj.winner.name)
+        if obj.winner:
+            return obj.winner.name
+        return "TBD"
 
     winner_display.short_description = "Winner"
+    winner_display.admin_order_field = "winner"
 
     def save_model(self, request, obj, form, change):
+        """
+        When a game's winner is updated, update any games that this game
+        feeds into, and update any predictions that were made on this game.
+        """
         super().save_model(request, obj, form, change)
-        if obj.winner:
-            # Update all predictions for this game
-            predictions = Prediction.objects.filter(game=obj)
-            for prediction in predictions:
+
+        # If the winner changed and this game feeds into another game
+        if "winner" in form.changed_data and obj.next_game:
+            # Update the next game with this winner
+            next_game = obj.next_game
+            if next_game.team1 is None:
+                next_game.team1 = obj.winner
+                next_game.seed1 = obj.seed1 if obj.winner == obj.team1 else obj.seed2
+            else:
+                next_game.team2 = obj.winner
+                next_game.seed2 = obj.seed1 if obj.winner == obj.team1 else obj.seed2
+            next_game.save()
+
+            # Update predictions for accuracy
+            for prediction in Prediction.objects.filter(game=obj):
                 prediction.is_correct = prediction.predicted_winner == obj.winner
                 prediction.save()
-
-            # If this game has a next game, update the teams
-            if obj.next_game:
-                next_game = obj.next_game
-                if (
-                    next_game.team1 is None
-                    or next_game.team1 == obj.team1
-                    or next_game.team1 == obj.team2
-                ):
-                    next_game.team1 = obj.winner
-                else:
-                    next_game.team2 = obj.winner
-                next_game.save()
 
 
 @admin.register(Team)
@@ -218,66 +215,8 @@ admin_site = BracketIQAdminSite(name="bracketiq_admin")
 
 
 # Register your models with the custom admin site
-@admin.register(Tournament, site=admin_site)
-class TournamentAdmin(admin.ModelAdmin):
-    list_display = ("name", "year", "start_date", "end_date")
-    list_filter = ("year",)
-    search_fields = ("name", "year")
-    ordering = ("-year",)
-
-
-@admin.register(Team, site=admin_site)
-class TeamAdmin(admin.ModelAdmin):
-    list_display = ("name", "short_name", "mascot")
-    search_fields = ("name", "short_name", "mascot")
-    ordering = ("name",)
-
-
-@admin.register(Game, site=admin_site)
-class GameAdmin(admin.ModelAdmin):
-    list_display = (
-        "get_tournament_display",
-        "get_round_display",
-        "region",
-        "game_number",
-        "get_matchup_display",
-    )
-    list_filter = ("tournament__year", "round", "region")
-    search_fields = ("team1__name", "team2__name", "tournament__name")
-    ordering = ("tournament", "round", "game_number")
-
-    def get_tournament_display(self, obj):
-        return str(obj.tournament)
-
-    get_tournament_display.short_description = "Tournament"
-    get_tournament_display.admin_order_field = "tournament"
-
-    def get_round_display(self, obj):
-        try:
-            return Round.from_value(obj.round).label
-        except ValueError:
-            return "Unknown Round"
-
-    get_round_display.short_description = "Round"
-    get_round_display.admin_order_field = "round"
-
-    def get_matchup_display(self, obj):
-        team1_name = obj.team1.name if obj.team1 else "TBD"
-        team2_name = obj.team2.name if obj.team2 else "TBD"
-        return f"({obj.seed1}) {team1_name} vs ({obj.seed2}) {team2_name}"
-
-    get_matchup_display.short_description = "Matchup"
-
-
-@admin.register(Bracket, site=admin_site)
-class BracketAdmin(admin.ModelAdmin):
-    list_display = ("name", "get_tournament_display", "user", "score", "created_at")
-    list_filter = ("tournament__year", "user")
-    search_fields = ("name", "user__username", "tournament__name")
-    ordering = ("-created_at",)
-
-    def get_tournament_display(self, obj):
-        return str(obj.tournament)
-
-    get_tournament_display.short_description = "Tournament"
-    get_tournament_display.admin_order_field = "tournament"
+admin_site.register(Tournament, TournamentAdmin)
+admin_site.register(Team, TeamAdmin)
+admin_site.register(Game, GameAdmin)
+admin_site.register(Bracket, BracketAdmin)
+admin_site.register(Prediction, PredictionAdmin)
