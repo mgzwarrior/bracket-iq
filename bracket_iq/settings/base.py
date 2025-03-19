@@ -38,7 +38,7 @@ SECRET_KEY = os.environ.get(
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
 # Always include these hosts for local development
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 
 # Application definition
@@ -155,4 +155,4 @@ DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER")
 SITE_ID = 1
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
-LOGOUT_REDIRECT_URL = "login" 
+LOGOUT_REDIRECT_URL = "login"
