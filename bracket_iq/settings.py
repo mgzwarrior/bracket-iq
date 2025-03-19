@@ -39,7 +39,7 @@ SECRET_KEY = os.environ.get(
 DEBUG = True
 
 # Always include these hosts for local development
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 
 # Application definition

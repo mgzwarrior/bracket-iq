@@ -37,27 +37,6 @@
             display: flex;
             gap: 0.5rem;
         }
-        .nav-button {
-            padding: 8px 16px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-        .admin-button {
-            background-color: #dc3545;
-            color: white;
-        }
-        .admin-button:hover {
-            background-color: #c82333;
-        }
-        .logout-button {
-            background-color: #6c757d;
-            color: white;
-        }
-        .logout-button:hover {
-            background-color: #5a6268;
-        }
     </style>
 </head>
 <body>
@@ -76,7 +55,10 @@
                 </div>
                 {% endif %}
                 {% if user.is_authenticated %}
-                <a href="{% url 'logout' %}" class="nav-button logout-button">Logout</a>
+                <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-button logout-button">Logout</button>
+                </form>
                 {% endif %}
             </div>
         </div>
