@@ -65,7 +65,7 @@ class ViewTests(TestCase):
         """Test the profile view - where bracketologists check their predictions!"""
         # Login before testing profile
         self.client.login(username="testuser", password="12345")
-        
+
         # Check the URL pattern rather than rendering the template
         url = reverse("profile")
         self.assertEqual(url, "/accounts/profile/")
@@ -73,11 +73,11 @@ class ViewTests(TestCase):
     def test_create_bracket_form_view(self):
         """Test bracket creation form - the moment of truth for every fan!"""
         self.client.login(username="testuser", password="12345")
-        
+
         # Get the bracket creation form
         response = self.client.get(reverse("create_bracket_form"))
         self.assertEqual(response.status_code, 200)
-        
+
         # Verify form contains tournament options
         self.assertContains(response, "tournament")
         self.assertContains(response, "Create Bracket")
@@ -86,22 +86,22 @@ class ViewTests(TestCase):
         """Test bracket creation - where March Madness dreams begin!"""
         # Login required for bracket creation
         self.client.login(username="testuser", password="12345")
-        
+
         # Verify the URL pattern is correct
         url = reverse("create_bracket", args=[self.tournament.pk])
         self.assertTrue("/bracket/create/" in url)
         self.assertTrue(str(self.tournament.pk) in url)
-        
+
         # No need to test the post functionality as it might be complex in the test environment
 
     def test_create_live_bracket_view(self):
         """Test live bracket creation - for the real-time tournament action!"""
         self.client.login(username="testuser", password="12345")
-        
+
         # Get the live bracket creation form
         response = self.client.get(reverse("create_live_bracket"))
         self.assertEqual(response.status_code, 200)
-        
+
         # Just verify URL correctness rather than functionality
         url = reverse("create_live_bracket")
         self.assertEqual(url, "/bracket/live/create/")
@@ -116,17 +116,15 @@ class ViewTests(TestCase):
     def test_delete_bracket_view(self):
         """Test bracket deletion - sometimes you need a fresh start!"""
         self.client.login(username="testuser", password="12345")
-        
+
         # Get initial bracket count
         initial_count = Bracket.objects.count()
-        
+
         # Delete the bracket
-        response = self.client.post(
-            reverse("delete_bracket", args=[self.bracket.pk])
-        )
-        
+        response = self.client.post(reverse("delete_bracket", args=[self.bracket.pk]))
+
         # Check if a bracket was deleted (count decreased)
         self.assertEqual(Bracket.objects.count(), initial_count - 1)
-        
+
         # Check the redirect response
         self.assertEqual(response.status_code, 302)
