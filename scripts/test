@@ -128,6 +128,25 @@ else
     # Set environment for local execution
     export DJANGO_SETTINGS_MODULE=bracket_iq.settings.test
     export PYTHONPATH=$(pwd)
+    
+    # Print debug information in CI environment
+    if [ "${GITHUB_ACTIONS}" == "true" ]; then
+        echo "Running in GitHub Actions environment"
+        echo "Python version: $(python --version)"
+        echo "Installed packages:"
+        pip list
+        echo "DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE}"
+        echo "TEST_DB_ENGINE: ${TEST_DB_ENGINE}"
+        echo "TEST_DB_NAME: ${TEST_DB_NAME}"
+        echo "PYTHONPATH: ${PYTHONPATH}"
+        
+        # Add extra parameters for GitHub CI
+        if [ "${TEST_DB_ENGINE}" == "django.db.backends.sqlite3" ]; then
+            echo "Using SQLite database for tests in CI"
+            PYTEST_ARGS+=" --ds=bracket_iq.settings.test"
+        fi
+    fi
+    
     runner=""
 fi
 

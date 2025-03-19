@@ -74,6 +74,18 @@ DATABASES = {
     }
 }
 
+# For SQLite, use in-memory database if specified
+if os.environ.get("TEST_DB_ENGINE") == "django.db.backends.sqlite3":
+    if os.environ.get("TEST_DB_NAME") == ":memory:":
+        DATABASES["default"]["NAME"] = ":memory:"
+    elif not os.environ.get("TEST_DB_NAME"):
+        DATABASES["default"]["NAME"] = ":memory:"
+    # No need for other database settings with SQLite
+    DATABASES["default"]["USER"] = ""
+    DATABASES["default"]["PASSWORD"] = ""
+    DATABASES["default"]["HOST"] = ""
+    DATABASES["default"]["PORT"] = ""
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
