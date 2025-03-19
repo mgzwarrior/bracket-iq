@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
@@ -30,13 +30,12 @@ STATICFILES_DIRS = [
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
+    "SECRET_KEY",
     "django-insecure-$*qdbek72t9m*wprjy^-#ln*%rzedn)uyhb05t+hmr4k7r0u^5",
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# For development, we're hardcoding DEBUG to True
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "0") == "1"
 
 # Always include these hosts for local development
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
@@ -156,4 +155,4 @@ DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER")
 SITE_ID = 1
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
-LOGOUT_REDIRECT_URL = "login"
+LOGOUT_REDIRECT_URL = "login" 
