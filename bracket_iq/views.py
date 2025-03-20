@@ -206,24 +206,31 @@ def delete_bracket(request, bracket_id):
 def rename_bracket(request, bracket_id):
     bracket = get_object_or_404(Bracket, id=bracket_id)
     if bracket.user != request.user:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({"success": False, "error": "You do not have permission to rename this bracket."})
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "You do not have permission to rename this bracket.",
+                }
+            )
         messages.error(request, "You do not have permission to rename this bracket.")
         return redirect("home")
 
     new_name = request.POST.get("name", "").strip()
     if not new_name:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({"success": False, "error": "Bracket name is required."})
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse(
+                {"success": False, "error": "Bracket name is required."}
+            )
         messages.error(request, "Bracket name is required.")
         return redirect("display_bracket", bracket_id=bracket_id)
 
     bracket.name = new_name
     bracket.save()
-    
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return JsonResponse({"success": True, "name": new_name})
-    
+
     messages.success(request, "Bracket renamed successfully!")
     return redirect("display_bracket", bracket_id=bracket_id)
 
