@@ -170,8 +170,21 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h1>{{ bracket.name }}</h1>
-    <p>Tournament: {{ bracket.tournament.name }}</p>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1>{{ bracket.name }}</h1>
+            <p class="mb-0">Tournament: {{ bracket.tournament.name }}</p>
+        </div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#renameBracketModal">
+                Rename Bracket
+            </button>
+            <form method="post" action="{% url 'delete_bracket' bracket_id=bracket.id %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Delete Bracket</button>
+            </form>
+        </div>
+    </div>
 
     <div class="accordion" id="bracketAccordion">
         {% for round_value, predictions in predictions_by_round.items %}
@@ -233,10 +246,33 @@
 </div>
 
 <div class="bracket-actions">
-    <form method="post" action="{% url 'delete_bracket' bracket_id=bracket.id %}" class="delete-form">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Delete Bracket</button>
-    </form>
+    <div class="btn-group mb-3">
+    </div>
+</div>
+
+<!-- Rename Bracket Modal -->
+<div class="modal fade" id="renameBracketModal" tabindex="-1" aria-labelledby="renameBracketModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="renameBracketModalLabel">Rename Bracket</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'rename_bracket' bracket_id=bracket.id %}" id="renameBracketForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="bracketName" class="form-label">Bracket Name</label>
+                        <input type="text" class="form-control" id="bracketName" name="name" value="{{ bracket.name }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -311,6 +347,54 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // Handle rename form submission
+    const renameForm = document.getElementById('renameBracketForm');
+    if (renameForm) {
+        renameForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': this.querySelector('[name="csrfmiddlewaretoken"]').value,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the bracket name in the page
+                    document.querySelector('h1').textContent = data.name;
+                    // Close the modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('renameBracketModal'));
+                    modal.hide();
+                    // Add success message
+                    const messageContainer = document.createElement('div');
+                    messageContainer.className = 'alert alert-success alert-dismissible fade show';
+                    messageContainer.innerHTML = `
+                        Bracket renamed successfully!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    document.querySelector('.container.mt-4').insertBefore(messageContainer, document.querySelector('.d-flex.justify-content-between'));
+                    // Auto-dismiss after 3 seconds
+                    setTimeout(() => {
+                        const alert = bootstrap.Alert.getOrCreateInstance(messageContainer);
+                        alert.close();
+                    }, 3000);
+                } else {
+                    alert('Error renaming bracket: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error renaming bracket. Please try again.');
+            });
+        });
+    }
 
     // Restore collapse states from localStorage
     const collapseStates = JSON.parse(localStorage.getItem(`bracketCollapseStates_${bracketId}`) || '{}');

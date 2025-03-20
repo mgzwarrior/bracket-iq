@@ -32,6 +32,9 @@ urlpatterns = [
         "bracket/<int:bracket_id>/delete/", views.delete_bracket, name="delete_bracket"
     ),
     path(
+        "bracket/<int:bracket_id>/rename/", views.rename_bracket, name="rename_bracket"
+    ),
+    path(
         "bracket/prediction/<int:prediction_id>/update/",
         views.update_prediction,
         name="update_prediction",

@@ -1,18 +1,79 @@
-{% extends "admin/index.html" %}
-{% load i18n %}
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .module {
+        margin: 10px;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+    }
+    .module h2 {
+        margin-top: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .module ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .module li {
+        margin: 5px 0;
+    }
+    .module a {
+        display: block;
+        padding: 8px 12px;
+        color: #447e9b;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+    .module a:hover {
+        background: #f5f5f5;
+        color: #036;
+    }
+</style>
+{% endblock %}
+
+{% block coltype %}colM{% endblock %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
 
 {% block content %}
-<div class="module" style="margin-bottom: 20px;">
-    <h2>Tournament Management</h2>
-    <div class="description" style="padding: 10px;">
-        <a href="{% url 'admin:seed_tournament' %}" class="button" style="background: var(--button-bg); color: var(--button-fg); padding: 10px 15px; border-radius: 4px; text-decoration: none; display: inline-block; margin-right: 10px;">
-            Seed Tournament
-        </a>
-        <p style="margin-top: 10px;">
-            Use this button to seed a new tournament. This will create all necessary tournament data including teams, regions, and initial matchups.
-        </p>
+<div id="content-main">
+    <div class="module">
+        <h2>Tournament Management</h2>
+        <ul>
+            <li><a href="{% url 'admin:seed_tournament' %}">Seed Tournament</a></li>
+            <li><a href="{% url 'admin:generate_brackets' %}">Generate Brackets</a></li>
+        </ul>
     </div>
-</div>
 
-{{ block.super }}
+    {% if app_list %}
+        {% for app in app_list %}
+            <div class="module">
+                <h2>{{ app.name }}</h2>
+                <ul>
+                    {% for model in app.models %}
+                        <li>
+                            <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>{% trans "You don't have permission to view or edit anything." %}</p>
+    {% endif %}
+</div>
 {% endblock %} 
