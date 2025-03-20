@@ -2,15 +2,18 @@
 import uuid
 from datetime import date
 from enum import Enum
+import logging
 
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 
-class Region(models.TextChoices):
+class Region(models.TextChoices):  # pylint: disable=too-many-ancestors
     EAST = "EAST", "East"
     WEST = "WEST", "West"
     MIDWEST = "MIDWEST", "Midwest"
@@ -54,6 +57,7 @@ class Round(Enum):
 
     @property
     def value(self):
+        """Return the round ID."""
         return self.round_id
 
     def __str__(self):
@@ -78,6 +82,7 @@ class BracketStrategy(Enum):
 
     @property
     def value(self):
+        """Return the strategy ID."""
         return self.strategy_id
 
     def __str__(self):
@@ -216,6 +221,28 @@ class Game(models.Model):
             if self.score2 > self.score1 and self.winner != self.team2:
                 raise ValidationError("Winner must be team2 if team2's score is higher")
 
+    def save(self, *args, **kwargs):
+        """Save the game and update predictions if the winner has changed."""
+        # Check if this is a new game or if the winner has changed
+        if self.pk:
+            old_game = Game.objects.get(pk=self.pk)
+            winner_changed = old_game.winner != self.winner
+        else:
+            winner_changed = self.winner is not None
+
+        # Save the game
+        super().save(*args, **kwargs)
+
+        # Update predictions if the winner has changed
+        if winner_changed and self.winner:
+            for prediction in self.predictions.all():
+                # Update is_correct and points_earned
+                prediction.is_correct = prediction.predicted_winner == self.winner
+                prediction.points_earned = (
+                    Round.get_points(self.round) if prediction.is_correct else 0
+                )
+                prediction.save()
+
     def __str__(self):
         team1_name = self.team1.name if self.team1 else "TBD"
         team2_name = self.team2.name if self.team2 else "TBD"
@@ -243,12 +270,26 @@ class Prediction(models.Model):
     @property
     def calculate_points(self):
         """Calculate points earned for this prediction."""
-        if not self.is_correct or not self.game:
+        if not self.is_correct:
+            logger.debug("Not correct for game %s", self.game.id)
             return 0
 
-        if hasattr(self.game, "round") and getattr(self.game, "winner", None):
-            return Round.get_points(self.game.round)
-        return 0
+        if not self.game:
+            logger.debug("No game for prediction %s", self.id)
+            return 0
+
+        if not hasattr(self.game, "round"):
+            logger.debug("No round for game %s", self.game.id)
+            return 0
+
+        if not hasattr(self.game, "winner"):
+            logger.debug("No winner for game %s", self.game.id)
+            return 0
+
+        game_round = getattr(self.game, "round", None)
+        points = Round.get_points(game_round)
+        logger.debug("Game %s round %s points %s", self.game.id, game_round, points)
+        return points
 
     def clean(self):
         if self.game and self.predicted_winner:
