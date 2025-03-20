@@ -1,7 +1,16 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from ..models import Team, Bracket, Game, Round, Tournament, Region
+from ..models import (
+    Team,
+    Bracket,
+    Game,
+    Round,
+    Tournament,
+    Region,
+    Prediction,
+    BracketGame,
+)
 
 User = get_user_model()
 
@@ -96,18 +105,6 @@ class ViewTests(TestCase):
 
         # No need to test the post functionality as it might be complex in the test environment
 
-    def test_create_live_bracket_view(self):
-        """Test live bracket creation - for the real-time tournament action!"""
-        self.client.login(username="testuser", password="12345")
-
-        # Get the live bracket creation form
-        response = self.client.get(reverse("create_live_bracket"))
-        self.assertEqual(response.status_code, 200)
-
-        # Just verify URL correctness rather than functionality
-        url = reverse("create_live_bracket")
-        self.assertEqual(url, "/bracket/live/create/")
-
     def test_display_bracket_view(self):
         """Test bracket display - showcase your tournament predictions!"""
         # Verify the URL pattern is correct rather than rendering the template
@@ -130,3 +127,128 @@ class ViewTests(TestCase):
 
         # Check the redirect response
         self.assertEqual(response.status_code, 302)
+
+    def test_fill_bracket_view(self):
+        """Test the fill bracket view functionality."""
+        self.client.login(username="testuser", password="12345")
+
+        # Test GET request
+        response = self.client.get(reverse("fill_bracket", args=[self.bracket.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fill Bracket")
+
+        # Test POST request with valid data
+        post_data = {"game_id": self.game.id, "winner": self.team1.id}
+        response = self.client.post(
+            reverse("fill_bracket", args=[self.bracket.id]), post_data
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("fill_bracket", args=[self.bracket.id]))
+
+        # Verify prediction was created
+        self.assertTrue(
+            Prediction.objects.filter(bracket=self.bracket, game=self.game).exists()
+        )
+
+    def test_view_bracket_view(self):
+        """Test the view bracket view functionality."""
+        self.client.login(username="testuser", password="12345")
+
+        # Test GET request
+        response = self.client.get(reverse("view_bracket", args=[self.bracket.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "View Bracket")
+
+        # Verify predictions are displayed
+        Prediction.objects.create(
+            bracket=self.bracket, game=self.game, predicted_winner=self.team1
+        )
+        response = self.client.get(reverse("view_bracket", args=[self.bracket.id]))
+        self.assertContains(response, self.team1.name)
+
+    def test_list_brackets_view(self):
+        """Test the list brackets view functionality."""
+        self.client.login(username="testuser", password="12345")
+
+        # Test GET request
+        response = self.client.get(reverse("list_brackets"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "List Brackets")
+
+        # Test pagination
+        response = self.client.get(reverse("list_brackets") + "?page=1")
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_prediction_view(self):
+        """Test the update prediction view functionality."""
+        self.client.login(username="testuser", password="12345")
+
+        # Create a bracket game first
+        BracketGame.objects.create(
+            bracket=self.bracket,
+            game=self.game,
+            team1=self.team1,
+            team2=self.team2,
+            team1_seed=self.game.seed1,
+            team2_seed=self.game.seed2,
+        )
+
+        # Create a prediction
+        prediction = Prediction.objects.create(
+            bracket=self.bracket, game=self.game, predicted_winner=self.team1
+        )
+
+        # Test POST request with valid data
+        post_data = {"game": self.game.id, "winner": self.team2.id}
+        response = self.client.post(
+            reverse("update_prediction", args=[prediction.id]), post_data
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["success"], True)
+
+        # Verify prediction was updated
+        prediction.refresh_from_db()
+        self.assertEqual(prediction.predicted_winner, self.team2)
+
+        # Test invalid winner
+        post_data = {"game": self.game.id, "winner": 99999}  # Invalid team ID
+        response = self.client.post(
+            reverse("update_prediction", args=[prediction.id]), post_data
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["success"], False)
+
+    def test_register_view(self):
+        """Test the register view functionality."""
+        # Test GET request
+        response = self.client.get(reverse("register"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Register")
+
+        # Test POST request with valid data
+        post_data = {
+            "username": "newuser",
+            "password1": "testpass123",
+            "password2": "testpass123",
+            "email": "newuser@example.com",
+        }
+        response = self.client.post(reverse("register"), post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("login"))
+
+        # Verify user was created
+        self.assertTrue(User.objects.filter(username="newuser").exists())
+
+        # Test POST request with invalid data
+        post_data = {
+            "username": "newuser2",
+            "password1": "testpass123",
+            "password2": "differentpass",  # Mismatched passwords
+            "email": "newuser2@example.com",
+        }
+        response = self.client.post(reverse("register"), post_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "alert alert-danger")  # Check for error class
+        self.assertContains(
+            response, "password fields"
+        )  # Check for partial error message

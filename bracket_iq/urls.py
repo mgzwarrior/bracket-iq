@@ -23,7 +23,7 @@ urlpatterns = [
         "bracket/create/", views.create_bracket_form, name="create_bracket_form"
     ),  # Form to select tournament
     path(
-        "bracket/create/<int:tournament_id>/",
+        "bracket/create/<int:tournament_id>/submit/",
         views.create_bracket,
         name="create_bracket",
     ),  # Create bracket for specific tournament
@@ -37,14 +37,9 @@ urlpatterns = [
         name="update_prediction",
     ),
     path("brackets/", views.list_brackets, name="list_brackets"),
-    path(
-        "bracket/live/create/", views.create_live_bracket, name="create_live_bracket"
-    ),  # Add live bracket creation
-    path(
-        "bracket/live/create/<int:game_number>/",
-        views.create_live_bracket,
-        name="create_live_bracket",
-    ),  # Add live bracket creation with game number
+    path("prediction/create/", views.create_prediction, name="create_prediction"),
+    path("bracket/<int:bracket_id>/fill/", views.fill_bracket, name="fill_bracket"),
+    path("bracket/<int:bracket_id>/view/", views.view_bracket, name="view_bracket"),
     # Password Reset URLs with template names specified
     path(
         "password_reset/",

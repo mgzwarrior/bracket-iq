@@ -19,7 +19,11 @@
                     <p>Year: {{ tournament.year }}</p>
                     <p>Dates: {{ tournament.start_date|date:"M d" }} - {{ tournament.end_date|date:"M d, Y" }}</p>
                     <div class="card-actions">
-                        <a href="{% url 'create_bracket' tournament_id=tournament.id %}" class="btn">Create Bracket</a>
+                        <form method="post" action="{% url 'create_bracket_form' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="tournament" value="{{ tournament.id }}">
+                            <button type="submit" class="btn">Create Bracket</button>
+                        </form>
                     </div>
                 </div>
             {% endfor %}
@@ -42,7 +46,8 @@
                 <div class="bracket-grid">
                     {% for bracket in user_brackets %}
                         <div class="card">
-                            <h3>{{ bracket.tournament.name }}</h3>
+                            <h3>{{ bracket.name }}</h3>
+                            <p>{{ bracket.tournament.name }}</p>
                             <p>Created: {{ bracket.created_at|date:"M d, Y" }}</p>
                             <div class="card-actions">
                                 <a href="{% url 'display_bracket' bracket_id=bracket.id %}" class="btn">View Bracket</a>
