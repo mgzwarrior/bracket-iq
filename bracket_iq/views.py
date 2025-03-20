@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 
 from .forms import GameForm, CustomUserCreationForm
-from .models import Team, Game, Bracket, Prediction, Round, Tournament
+from .models import Team, Game, Bracket, Prediction, Round, Tournament, BracketGame
 
 
 @login_required(login_url="login")
@@ -47,22 +47,34 @@ def profile(request):
 @require_POST
 def create_bracket(request, tournament_id):
     tournament = get_object_or_404(Tournament, id=tournament_id)
+    bracket_name = request.POST.get('bracket_name', '').strip()
+    
+    if not bracket_name:
+        messages.error(request, "Bracket name is required.")
+        return redirect('create_bracket_form')
 
     # Create a new bracket for this user and tournament
-    bracket = Bracket.objects.create(user=request.user, tournament=tournament)
+    bracket = Bracket.objects.create(
+        user=request.user,
+        tournament=tournament,
+        name=bracket_name
+    )
 
     # Get all games for this tournament
     games = Game.objects.filter(tournament=tournament).order_by("round", "game_number")
 
-    # Create predictions for each game
+    # Create bracket games for each game
     for game in games:
-        Prediction.objects.create(
+        BracketGame.objects.create(
             bracket=bracket,
             game=game,
-            predicted_winner=game.team1 if game.team1 else None,
+            team1=game.team1,
+            team2=game.team2,
+            team1_seed=game.seed1,
+            team2_seed=game.seed2,
         )
 
-    messages.success(request, "Bracket created successfully.")
+    messages.success(request, "Bracket created successfully. You can now start making your predictions!")
     return redirect("display_bracket", bracket_id=bracket.id)
 
 
@@ -71,7 +83,8 @@ def create_bracket_form(request):
     if request.method == "POST":
         tournament_id = request.POST.get("tournament")
         if tournament_id:
-            return redirect("create_bracket", tournament_id=tournament_id)
+            # Instead of redirecting, we'll render the create_bracket view directly
+            return create_bracket(request, tournament_id)
 
         messages.error(request, "Please select a tournament.")
 
@@ -131,6 +144,11 @@ def display_bracket(request, bracket_id):
         "round", "game_number"
     )
 
+    # Get all bracket games for this bracket
+    bracket_games = {
+        bg.game_id: bg for bg in BracketGame.objects.filter(bracket=bracket)
+    }
+
     # Organize predictions by round for easier rendering
     predictions_by_round: Dict[int, List[Dict[str, Any]]] = {}
 
@@ -139,15 +157,22 @@ def display_bracket(request, bracket_id):
         if round_value not in predictions_by_round:
             predictions_by_round[round_value] = []
 
-        # Find or create prediction
-        prediction, _ = Prediction.objects.get_or_create(
-            bracket=bracket,
-            game=game,
-            defaults={"predicted_winner": game.team1},
-        )
+        # Find prediction if it exists
+        try:
+            prediction = Prediction.objects.get(bracket=bracket, game=game)
+        except Prediction.DoesNotExist:
+            prediction = None
 
+        # Get bracket game if it exists
+        bracket_game = bracket_games.get(game.id)
+
+        # Add game to display regardless of team status
         predictions_by_round[round_value].append(
-            {"game": game, "prediction": prediction}
+            {
+                "game": game,
+                "prediction": prediction,
+                "bracket_game": bracket_game,
+            }
         )
 
     for round_value, predictions in predictions_by_round.items():
@@ -156,13 +181,18 @@ def display_bracket(request, bracket_id):
             predictions, key=lambda p: p["game"].game_number
         )
 
+    # Create a dictionary mapping round values to their labels
+    round_names = {}
+    for round_enum in Round:
+        round_names[round_enum.value] = round_enum.label
+
     context = {
         "bracket": bracket,
         "predictions_by_round": predictions_by_round,
-        "round_names": {r.value: r.label for r in Round},
+        "round_names": round_names,
     }
 
-    return render(request, "bracket_iq/display_bracket.html", context)
+    return render(request, "display_bracket.html", context)
 
 
 @login_required
@@ -322,3 +352,90 @@ def list_brackets(request):
     page_obj = paginator.get_page(page)
 
     return render(request, "list_brackets.html", {"brackets": page_obj})
+
+
+@login_required
+@require_POST
+def create_prediction(request):
+    # Get the bracket and game
+    bracket = get_object_or_404(Bracket, id=request.POST.get("bracket"), user=request.user)
+    game = get_object_or_404(Game, id=request.POST.get("game"))
+    winner_id = request.POST.get("winner")
+
+    if not winner_id:
+        messages.error(request, "Please select a winner")
+        return redirect("display_bracket", bracket_id=bracket.id)
+
+    # Verify this is a valid choice
+    winner = get_object_or_404(Team, id=winner_id)
+    if winner not in [game.team1, game.team2]:
+        messages.error(request, "Invalid winner selection")
+        return redirect("display_bracket", bracket_id=bracket.id)
+
+    # Create or update the prediction
+    prediction, created = Prediction.objects.update_or_create(
+        bracket=bracket,
+        game=game,
+        defaults={"predicted_winner": winner}
+    )
+
+    # If this game has a next game, update the teams in the next bracket game
+    if game.next_game:
+        next_game = game.next_game
+        other_game = (
+            Game.objects.filter(next_game=next_game)
+            .exclude(id=game.id)
+            .first()
+        )
+
+        # Get the other game's prediction if it exists
+        other_winner = None
+        if other_game:
+            other_pred = Prediction.objects.filter(
+                bracket=bracket, game=other_game
+            ).first()
+            if other_pred:
+                other_winner = other_pred.predicted_winner
+
+        # Get or create the next bracket game
+        next_bracket_game, _ = BracketGame.objects.get_or_create(
+            bracket=bracket,
+            game=next_game,
+        )
+
+        # Update the next bracket game's teams based on the predictions
+        if game.team1_id == int(winner_id):
+            if next_bracket_game.team1 is None:
+                next_bracket_game.team1_id = winner_id
+                next_bracket_game.seed1 = game.seed1
+            elif next_bracket_game.team2 is None:
+                next_bracket_game.team2_id = winner_id
+                next_bracket_game.seed1 = game.seed1
+        else:
+            if next_bracket_game.team1 is None:
+                next_bracket_game.team1_id = winner_id
+                next_bracket_game.seed1 = game.seed2
+            elif next_bracket_game.team2 is None:
+                next_bracket_game.team2_id = winner_id
+                next_bracket_game.seed2 = game.seed2
+
+        if other_winner:
+            if other_game.team1 == other_winner:
+                if next_bracket_game.team1 is None:
+                    next_bracket_game.team1 = other_winner
+                    next_bracket_game.seed1 = other_game.seed1
+                elif next_bracket_game.team2 is None:
+                    next_bracket_game.team2 = other_winner
+                    next_bracket_game.seed2 = other_game.seed1
+            else:
+                if next_bracket_game.team1 is None:
+                    next_bracket_game.team1 = other_winner
+                    next_bracket_game.seed1 = other_game.seed2
+                elif next_bracket_game.team2 is None:
+                    next_bracket_game.team2 = other_winner
+                    next_bracket_game.seed2 = other_game.seed2
+
+        next_bracket_game.save()
+
+    messages.success(request, "Prediction created successfully")
+    return redirect("display_bracket", bracket_id=bracket.id)

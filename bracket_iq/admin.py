@@ -10,7 +10,7 @@ from django.template.response import TemplateResponse
 from django.urls import path
 from django import forms
 
-from .models import Tournament, Team, Game, Bracket, Prediction
+from .models import Tournament, Team, Game, Bracket, Prediction, BracketGame
 
 
 class BracketIQAdminSite(AdminSite):
@@ -225,6 +225,10 @@ class GameAdmin(admin.ModelAdmin):
     def matchup(self, obj):
         if obj.team1 and obj.team2:
             return f"({obj.seed1}) {obj.team1.name} vs ({obj.seed2}) {obj.team2.name}"
+        elif obj.team1:
+            return f"({obj.seed1}) {obj.team1.name} vs TBD"
+        elif obj.team2:
+            return f"TBD vs ({obj.seed2}) {obj.team2.name}"
         return "TBD"
 
     def score_display(self, obj):
@@ -404,6 +408,85 @@ class PredictionAdmin(admin.ModelAdmin):
     readonly_fields = ("points_earned",)
 
 
+@admin.register(BracketGame)
+class BracketGameAdmin(admin.ModelAdmin):
+    list_display = (
+        "bracket_name",
+        "bracket_user",
+        "game",
+        "matchup",
+        "winner_display",
+        "status",
+        "updated_at",
+    )
+    list_filter = ("bracket__tournament", "game__round", "game__region")
+    search_fields = ("bracket__name", "bracket__user__username", "team1__name", "team2__name")
+    readonly_fields = ("created_at", "updated_at")
+
+    def bracket_name(self, obj):
+        return obj.bracket.name
+    bracket_name.short_description = "Bracket Name"
+    bracket_name.admin_order_field = "bracket__name"
+
+    def bracket_user(self, obj):
+        return obj.bracket.user.username
+    bracket_user.short_description = "User"
+    bracket_user.admin_order_field = "bracket__user__username"
+
+    fieldsets = [
+        (
+            "Bracket Information",
+            {
+                "fields": ["bracket", "game"],
+            },
+        ),
+        (
+            "Teams",
+            {
+                "fields": [("team1", "team1_seed"), ("team2", "team2_seed")],
+            },
+        ),
+        (
+            "Result",
+            {
+                "fields": ["winner"],
+                "classes": ["wide"],
+            },
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ["created_at", "updated_at"],
+                "classes": ["collapse"],
+            },
+        ),
+    ]
+
+    def matchup(self, obj):
+        team1_name = obj.team1.name if obj.team1 else "TBD"
+        team2_name = obj.team2.name if obj.team2 else "TBD"
+        team1_seed = f"({obj.team1_seed})" if obj.team1_seed else ""
+        team2_seed = f"({obj.team2_seed})" if obj.team2_seed else ""
+        return f"{team1_seed} {team1_name} vs {team2_seed} {team2_name}"
+
+    def winner_display(self, obj):
+        if obj.winner:
+            return obj.winner.name
+        return "TBD"
+
+    winner_display.short_description = "Winner"
+    winner_display.admin_order_field = "winner"
+
+    def status(self, obj):
+        if not obj.team1 or not obj.team2:
+            return "Waiting for teams"
+        if obj.winner:
+            return "Completed"
+        return "In Progress"
+
+    status.short_description = "Status"
+
+
 # Create the custom admin site
 admin_site = BracketIQAdminSite(name="bracketiq_admin")
 
@@ -414,3 +497,4 @@ admin_site.register(Team, TeamAdmin)
 admin_site.register(Game, GameAdmin)
 admin_site.register(Bracket, BracketAdmin)
 admin_site.register(Prediction, PredictionAdmin)
+admin_site.register(BracketGame, BracketGameAdmin)
