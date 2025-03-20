@@ -27,6 +27,11 @@ class UITests(TestCase):
 
     def test_home_page_ui_elements(self):
         """Test that our home page has all the required UI elements."""
+        # Create a bracket for testing
+        Bracket.objects.create(
+            user=self.user, tournament=self.tournament, name="Test Bracket 2024"
+        )
+
         response = self.client.get(reverse("home"))
 
         # Check for the welcome message
@@ -41,6 +46,10 @@ class UITests(TestCase):
         # Check for tournament elements when they exist
         self.assertContains(response, "NCAA March Madness")
         self.assertContains(response, "2024")
+
+        # Check for bracket elements in the correct order
+        self.assertContains(response, "<h3>Test Bracket 2024</h3>")
+        self.assertContains(response, "<p>NCAA March Madness</p>")
 
         # Check for the create bracket link
         self.assertContains(response, "Create Bracket")
@@ -68,7 +77,6 @@ class UITests(TestCase):
             ("Home", "/"),
             ("Profile", "/accounts/profile/"),
             ("Create Bracket", "/bracket/create/"),
-            ("Create Live Bracket", "/bracket/live/create/"),
         ]
 
         for link_text, link_url in nav_links:

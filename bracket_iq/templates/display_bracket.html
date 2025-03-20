@@ -2,62 +2,7 @@
 {% extends "base_generic.html" %}
 {% load bracket_filters %}
 
-{% block content %}
-<div class="container mt-4">
-    <h1>{{ bracket.name }}</h1>
-    <p>Tournament: {{ bracket.tournament.name }}</p>
-
-    {% for round_value, predictions in predictions_by_round.items %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h3>{{ round_names|get_item:round_value }}</h3>
-        </div>
-        <div class="card-body">
-            {% for prediction_data in predictions %}
-                {% with game=prediction_data.game prediction=prediction_data.prediction bracket_game=prediction_data.bracket_game %}
-                <div class="game-prediction mb-3">
-                    <h4>Game {{ game.game_number }}</h4>
-                    <div class="teams">
-                        <div class="team {% if prediction and prediction.predicted_winner == bracket_game.team1 %}selected{% endif %}">
-                            {{ bracket_game.team1.name|default:"TBD" }}
-                        </div>
-                        <div class="team {% if prediction and prediction.predicted_winner == bracket_game.team2 %}selected{% endif %}">
-                            {{ bracket_game.team2.name|default:"TBD" }}
-                        </div>
-                    </div>
-                    {% if prediction %}
-                    <form method="post" action="{% url 'update_prediction' prediction_id=prediction.id %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="game" value="{{ game.id }}">
-                        <input type="hidden" name="winner" value="{{ prediction.predicted_winner.id }}">
-                        <button type="submit" class="btn btn-primary">Update Prediction</button>
-                    </form>
-                    {% else %}
-                    <form method="post" action="{% url 'create_prediction' %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="bracket" value="{{ bracket.id }}">
-                        <input type="hidden" name="game" value="{{ game.id }}">
-                        <div class="btn-group" role="group">
-                            <button type="submit" name="winner" value="{{ bracket_game.team1.id }}" class="btn btn-outline-primary" {% if not bracket_game.team1 %}disabled{% endif %}>Pick {{ bracket_game.team1.name|default:"TBD" }}</button>
-                            <button type="submit" name="winner" value="{{ bracket_game.team2.id }}" class="btn btn-outline-primary" {% if not bracket_game.team2 %}disabled{% endif %}>Pick {{ bracket_game.team2.name|default:"TBD" }}</button>
-                        </div>
-                    </form>
-                    {% endif %}
-                </div>
-                {% endwith %}
-            {% endfor %}
-        </div>
-    </div>
-    {% endfor %}
-</div>
-
-<div class="bracket-actions">
-    <form method="post" action="{% url 'delete_bracket' bracket_id=bracket.id %}" class="delete-form">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Delete Bracket</button>
-    </form>
-</div>
-
+{% block extra_css %}
 <style>
 .bracket-container {
     display: flex;
@@ -137,6 +82,34 @@
     font-weight: bold;
 }
 
+.btn-link {
+    text-decoration: none;
+    color: #333;
+    font-weight: bold;
+    width: 100%;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+}
+
+.btn-link:hover {
+    text-decoration: none;
+    color: #2196f3;
+    background: rgba(33, 150, 243, 0.05);
+}
+
+.btn-link .fas {
+    transition: transform 0.2s ease-in-out;
+    margin-right: 0.5rem;
+}
+
+.btn-link.collapsed .fas {
+    transform: rotate(-90deg);
+}
+
 .btn-primary {
     background: #2196f3;
     color: white;
@@ -178,5 +151,224 @@
     display: flex;
     gap: 0.5rem;
 }
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    padding: 0;
+}
+
+.card-header h3 {
+    margin: 0;
+}
+
+.accordion .card {
+    overflow: hidden;
+}
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ bracket.name }}</h1>
+    <p>Tournament: {{ bracket.tournament.name }}</p>
+
+    <div class="accordion" id="bracketAccordion">
+        {% for round_value, predictions in predictions_by_round.items %}
+        <div class="card mb-4">
+            <div class="card-header" id="heading{{ round_value }}">
+                <h3 class="mb-0">
+                    <button class="btn btn-link collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ round_value }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ round_value }}">
+                        <i class="fas fa-chevron-right"></i>
+                        {{ round_names|get_item:round_value }}
+                    </button>
+                </h3>
+            </div>
+            <div id="collapse{{ round_value }}" class="collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ round_value }}" data-bs-parent="#bracketAccordion">
+                <div class="card-body">
+                    {% for prediction_data in predictions %}
+                        {% with game=prediction_data.game prediction=prediction_data.prediction bracket_game=prediction_data.bracket_game %}
+                        <div class="game-prediction mb-3">
+                            <h4>Game {{ game.game_number }}</h4>
+                            <div class="teams">
+                                <div class="team {% if prediction and prediction.predicted_winner == bracket_game.team1 %}selected{% endif %}">
+                                    {{ bracket_game.team1.name|default:"TBD" }} ({{ bracket_game.team1_seed|default:game.seed1 }})
+                                </div>
+                                <div class="team {% if prediction and prediction.predicted_winner == bracket_game.team2 %}selected{% endif %}">
+                                    {{ bracket_game.team2.name|default:"TBD" }} ({{ bracket_game.team2_seed|default:game.seed2 }})
+                                </div>
+                            </div>
+                            {% if prediction %}
+                            <form method="post" action="{% url 'update_prediction' prediction_id=prediction.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="game" value="{{ game.id }}">
+                                <div class="btn-group" role="group">
+                                    <input type="radio" name="winner" value="{{ bracket_game.team1.id }}" id="team1_{{ game.id }}" {% if prediction.predicted_winner == bracket_game.team1 %}checked{% endif %} class="btn-check">
+                                    <label class="btn btn-outline-primary" for="team1_{{ game.id }}">{{ bracket_game.team1.name }}</label>
+                                    
+                                    <input type="radio" name="winner" value="{{ bracket_game.team2.id }}" id="team2_{{ game.id }}" {% if prediction.predicted_winner == bracket_game.team2 %}checked{% endif %} class="btn-check">
+                                    <label class="btn btn-outline-primary" for="team2_{{ game.id }}">{{ bracket_game.team2.name }}</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary mt-2">Update Prediction</button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="{% url 'create_prediction' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="bracket" value="{{ bracket.id }}">
+                                <input type="hidden" name="game" value="{{ game.id }}">
+                                <div class="btn-group" role="group">
+                                    <button type="submit" name="winner" value="{{ bracket_game.team1.id }}" class="btn btn-outline-primary" {% if not bracket_game.team1 %}disabled{% endif %}>Pick {{ bracket_game.team1.name|default:"TBD" }}</button>
+                                    <button type="submit" name="winner" value="{{ bracket_game.team2.id }}" class="btn btn-outline-primary" {% if not bracket_game.team2 %}disabled{% endif %}>Pick {{ bracket_game.team2.name|default:"TBD" }}</button>
+                                </div>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="bracket-actions">
+    <form method="post" action="{% url 'delete_bracket' bracket_id=bracket.id %}" class="delete-form">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Delete Bracket</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const bracketId = '{{ bracket.id }}';
+    const roundCompletion = JSON.parse('{{ round_completion|escapejs|safe }}');
+    
+    // Function to expand a specific round
+    function expandRound(roundValue) {
+        const collapseElement = document.querySelector(`#collapse${roundValue}`);
+        if (collapseElement) {
+            collapseElement.classList.add('show');
+            // Update localStorage
+            const states = JSON.parse(localStorage.getItem(`bracketCollapseStates_${bracketId}`) || '{}');
+            states[`collapse${roundValue}`] = true;
+            localStorage.setItem(`bracketCollapseStates_${bracketId}`, JSON.stringify(states));
+        }
+    }
+
+    // Function to collapse a specific round
+    function collapseRound(roundValue) {
+        const collapseElement = document.querySelector(`#collapse${roundValue}`);
+        if (collapseElement) {
+            collapseElement.classList.remove('show');
+            // Update localStorage
+            const states = JSON.parse(localStorage.getItem(`bracketCollapseStates_${bracketId}`) || '{}');
+            states[`collapse${roundValue}`] = false;
+            localStorage.setItem(`bracketCollapseStates_${bracketId}`, JSON.stringify(states));
+        }
+    }
+
+    // Handle prediction form submissions
+    document.querySelectorAll('form[action^="/bracket/prediction/"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Get the selected radio button value
+            const winner = this.querySelector('input[name="winner"]:checked');
+            const game = this.querySelector('input[name="game"]');
+            
+            if (!winner || !game) {
+                alert('Please select a team');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', this.querySelector('[name="csrfmiddlewaretoken"]').value);
+            formData.append('game', game.value);
+            formData.append('winner', winner.value);
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': this.querySelector('[name="csrfmiddlewaretoken"]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to show updated predictions
+                    window.location.reload();
+                } else {
+                    alert('Error updating prediction: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating prediction. Please try again.');
+            });
+        });
+    });
+
+    // Restore collapse states from localStorage
+    const collapseStates = JSON.parse(localStorage.getItem(`bracketCollapseStates_${bracketId}`) || '{}');
+    
+    // Get all collapsible elements
+    const collapseElements = document.querySelectorAll('.collapse');
+    
+    // Find the first incomplete round
+    let firstIncompleteRound = null;
+    for (const [roundValue, completion] of Object.entries(roundCompletion)) {
+        if (completion < 1) {
+            firstIncompleteRound = parseInt(roundValue);
+            break;
+        }
+    }
+
+    // Expand the first incomplete round and collapse others
+    collapseElements.forEach(element => {
+        const roundId = element.id;
+        const roundValue = parseInt(roundId.replace('collapse', ''));
+        
+        if (roundValue === firstIncompleteRound) {
+            element.classList.add('show');
+            collapseStates[roundId] = true;
+        } else {
+            // Only collapse if it's a completed round
+            if (roundCompletion[roundValue] === 1) {
+                element.classList.remove('show');
+                collapseStates[roundId] = false;
+            } else {
+                // Keep the state from localStorage for incomplete rounds
+                if (collapseStates[roundId] === true) {
+                    element.classList.add('show');
+                } else if (collapseStates[roundId] === false) {
+                    element.classList.remove('show');
+                }
+            }
+        }
+    });
+
+    // Save the initial states
+    localStorage.setItem(`bracketCollapseStates_${bracketId}`, JSON.stringify(collapseStates));
+
+    // Listen for collapse/expand events and save state
+    const accordion = document.getElementById('bracketAccordion');
+    accordion.addEventListener('shown.bs.collapse', function(e) {
+        const roundId = e.target.id;
+        const states = JSON.parse(localStorage.getItem(`bracketCollapseStates_${bracketId}`) || '{}');
+        states[roundId] = true;
+        localStorage.setItem(`bracketCollapseStates_${bracketId}`, JSON.stringify(states));
+    });
+
+    accordion.addEventListener('hidden.bs.collapse', function(e) {
+        const roundId = e.target.id;
+        const states = JSON.parse(localStorage.getItem(`bracketCollapseStates_${bracketId}`) || '{}');
+        states[roundId] = false;
+        localStorage.setItem(`bracketCollapseStates_${bracketId}`, JSON.stringify(states));
+    });
+});
+</script>
 {% endblock %}

@@ -301,8 +301,11 @@ class Command(BaseCommand):
                         game_date=round_of_32_start
                         + timedelta(hours=len(games_by_round[Round.ROUND_OF_32.value])),
                     )
+                    # Update both Round of 64 games to point to this Round of 32 game
                     game1.next_game = game
+                    game1.save()
                     game2.next_game = game
+                    game2.save()
                     games_by_round[Round.ROUND_OF_32.value].append(game)
                     game_number += 1
 
@@ -326,8 +329,11 @@ class Command(BaseCommand):
                         game_date=sweet_16_start
                         + timedelta(hours=len(games_by_round[Round.SWEET_16.value])),
                     )
+                    # Update both Round of 32 games to point to this Sweet 16 game
                     region_games[i].next_game = game
+                    region_games[i].save()
                     region_games[i + 1].next_game = game
+                    region_games[i + 1].save()
                     games_by_round[Round.SWEET_16.value].append(game)
                     game_number += 1
 
@@ -351,8 +357,11 @@ class Command(BaseCommand):
                         game_date=elite_8_start
                         + timedelta(hours=len(games_by_round[Round.ELITE_8.value])),
                     )
+                    # Update both Sweet 16 games to point to this Elite 8 game
                     region_games[i].next_game = game
+                    region_games[i].save()
                     region_games[i + 1].next_game = game
+                    region_games[i + 1].save()
                     games_by_round[Round.ELITE_8.value].append(game)
                     game_number += 1
 
@@ -386,6 +395,7 @@ class Command(BaseCommand):
                     game_date=final_four_start
                     + timedelta(hours=len(games_by_round[Round.FINAL_FOUR.value])),
                 )
+                # Update both Elite 8 games to point to this Final Four game
                 region1_game.next_game = game
                 region1_game.save()
                 region2_game.next_game = game

@@ -1,5 +1,8 @@
-{% extends 'base.html' %}
+{% extends "base_generic.html" %}
 {% load static %}
+{% load bracket_filters %}
+
+{% block title %}Fill Bracket - {{ bracket.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
