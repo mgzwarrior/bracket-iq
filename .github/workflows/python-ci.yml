@@ -75,13 +75,9 @@ jobs:
       run: |
         ./scripts/check || echo "Code quality checks failed but continuing"
       
-    - name: Run tests with coverage using script
+    - name: Run tests with coverage and generate report
       run: |
-        ./scripts/test --coverage || echo "Tests failed with script but continuing"
-        
-    - name: Generate coverage report
-      run: |
-        ./scripts/test --report || python -m pytest bracket_iq/ --cov=bracket_iq --cov-report=html
+        ./scripts/test --coverage --report || python -m pytest bracket_iq/ --cov=bracket_iq --cov-report=html
         
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
