@@ -102,6 +102,59 @@ class BracketIQAdminSite(AdminSite):
             request, "admin/bracketiq_admin/seed_tournament.html", context
         )
 
+    def _create_bracket(self, user, tournament, strategy_enum, games):
+        """Helper method to create a single bracket with games and predictions."""
+        base_name = f"{strategy_enum.label} Bracket"
+
+        # Get the highest numbered bracket for this tournament, strategy, and user
+        highest_bracket = (
+            Bracket.objects.filter(
+                name__startswith=base_name,
+                tournament=tournament,
+                user=user,
+            )
+            .order_by("-name")
+            .first()
+        )
+
+        # Extract the highest number or start at 0
+        if highest_bracket:
+            try:
+                highest_num = int(highest_bracket.name.split()[-1])
+            except (ValueError, IndexError):
+                highest_num = 0
+        else:
+            highest_num = 0
+
+        # Keep trying numbers until we find an unused one
+        counter = highest_num + 1
+        while True:
+            try:
+                bracket = Bracket.objects.create(
+                    user=user,
+                    tournament=tournament,
+                    name=f"{base_name} {counter}",
+                )
+                break  # If creation succeeds, break the loop
+            except django.db.IntegrityError:
+                counter += 1  # Try the next number
+
+        # Create bracket games
+        for game in games:
+            BracketGame.objects.create(
+                bracket=bracket,
+                game=game,
+                team1=game.team1,
+                team2=game.team2,
+                team1_seed=game.seed1,
+                team2_seed=game.seed2,
+            )
+
+        # Generate predictions based on strategy
+        self._generate_predictions(bracket, games, strategy_enum)
+
+        return bracket
+
     def generate_brackets_view(self, request):
         context = dict(
             self.each_context(request),
@@ -134,6 +187,7 @@ class BracketIQAdminSite(AdminSite):
             strategy = request.POST.get("strategy")
             num_brackets = request.POST.get("num_brackets", "1")
             use_current_user = request.POST.get("use_current_user", "false") == "true"
+            user_prefix = request.POST.get("user_prefix", "AutoGen")
 
             if not all([tournament_id, strategy, num_brackets]):
                 messages.error(request, "All fields are required.")
@@ -157,7 +211,7 @@ class BracketIQAdminSite(AdminSite):
                     if use_current_user:
                         user = request.user
                     else:
-                        username = f"AutoGen_{i+1}"
+                        username = f"{user_prefix}_{i+1}"
                         user = User.objects.get_or_create(
                             username=username,
                             defaults={
@@ -166,51 +220,7 @@ class BracketIQAdminSite(AdminSite):
                             },
                         )[0]
 
-                    # Create the bracket
-                    base_name = f"{strategy_enum.label} Bracket"
-                    
-                    # Get the highest numbered bracket for this tournament, strategy, and user
-                    highest_bracket = Bracket.objects.filter(
-                        name__startswith=base_name,
-                        tournament=tournament,
-                        user=user  # Add user to the filter
-                    ).order_by('-name').first()
-
-                    # Extract the highest number or start at 0
-                    if highest_bracket:
-                        try:
-                            highest_num = int(highest_bracket.name.split()[-1])
-                        except (ValueError, IndexError):
-                            highest_num = 0
-                    else:
-                        highest_num = 0
-
-                    # Keep trying numbers until we find an unused one
-                    counter = highest_num + 1
-                    while True:
-                        try:
-                            bracket = Bracket.objects.create(
-                                user=user,
-                                tournament=tournament,
-                                name=f"{base_name} {counter}"
-                            )
-                            break  # If creation succeeds, break the loop
-                        except django.db.IntegrityError:
-                            counter += 1  # Try the next number
-
-                    # Create bracket games
-                    for game in games:
-                        BracketGame.objects.create(
-                            bracket=bracket,
-                            game=game,
-                            team1=game.team1,
-                            team2=game.team2,
-                            team1_seed=game.seed1,
-                            team2_seed=game.seed2,
-                        )
-
-                    # Generate predictions based on strategy
-                    self._generate_predictions(bracket, games, strategy_enum)
+                    self._create_bracket(user, tournament, strategy_enum, games)
 
                 messages.success(
                     request,
