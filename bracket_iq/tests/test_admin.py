@@ -1,9 +1,20 @@
+from unittest import mock
+
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.contrib.admin.sites import AdminSite
+import django.db
 
-from ..models import Team, Game, Tournament, Bracket, Prediction, Round
+from ..models import (
+    Team,
+    Game,
+    Tournament,
+    Bracket,
+    Prediction,
+    Round,
+    BracketStrategy,
+)
 from ..admin import GameAdmin, GameForm
 
 
@@ -324,3 +335,99 @@ class AdminSiteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         # Check for tournament management elements
         self.assertContains(response, "Tournament Management")
+
+
+class BracketGenerationTests(TestCase):
+    """Test suite for bracket generation functionality and error handling."""
+
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data for all tests in this class."""
+        # Create admin user
+        User = get_user_model()
+        cls.admin_user = User.objects.create_superuser(
+            username="admin", email="admin@example.com", password="password"
+        )
+
+        # Create a tournament
+        cls.tournament = Tournament.objects.create(
+            year=2024,
+            name="Test Tournament",
+            start_date="2024-03-19",
+            end_date="2024-04-08",
+        )
+
+    def setUp(self):
+        """Set up before each test."""
+        self.client = Client()
+        self.client.login(username="admin", password="password")
+        self.url = reverse("admin:generate_brackets")
+
+    def test_nonexistent_tournament_error(self):
+        """Test error handling when tournament doesn't exist."""
+        response = self.client.post(
+            self.url,
+            {
+                "tournament": "999999",  # Non-existent tournament ID
+                "strategy": BracketStrategy.RANDOM.value,
+                "num_brackets": "1",
+                "user_prefix": "Test",
+            },
+        )
+
+        self.assertContains(response, "Tournament with ID 999999 does not exist")
+        self.assertEqual(Bracket.objects.count(), 0)
+
+    def test_invalid_strategy_error(self):
+        """Test error handling when strategy is invalid."""
+        response = self.client.post(
+            self.url,
+            {
+                "tournament": str(self.tournament.id),
+                "strategy": "INVALID_STRATEGY",
+                "num_brackets": "1",
+                "user_prefix": "Test",
+            },
+        )
+
+        self.assertContains(response, "Invalid strategy: INVALID_STRATEGY")
+        self.assertEqual(Bracket.objects.count(), 0)
+
+    def test_invalid_num_brackets_error(self):
+        """Test error handling when number of brackets is invalid."""
+        response = self.client.post(
+            self.url,
+            {
+                "tournament": str(self.tournament.id),
+                "strategy": BracketStrategy.RANDOM.value,
+                "num_brackets": "invalid",
+                "user_prefix": "Test",
+            },
+        )
+
+        self.assertContains(response, "Invalid number of brackets: invalid")
+        self.assertEqual(Bracket.objects.count(), 0)
+
+    def test_database_error_handling(self):
+        """Test handling of database errors during bracket creation."""
+        with mock.patch("django.db.models.Model.save") as mock_save:
+            # Configure the mock to raise a database error
+            mock_save.side_effect = django.db.Error("Test DB Error")
+
+            # Make the request
+            response = self.client.post(
+                self.url,
+                {
+                    "tournament": str(self.tournament.id),
+                    "strategy": BracketStrategy.RANDOM.value,
+                    "num_brackets": "1",
+                    "user_prefix": "Test",
+                },
+            )
+
+            # Verify the error message is shown
+            self.assertContains(
+                response, "Database error while creating bracket: Test DB Error"
+            )
+            # Verify no brackets were created
+            self.assertEqual(Bracket.objects.count(), 0)

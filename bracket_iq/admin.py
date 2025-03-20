@@ -12,6 +12,7 @@ from django.shortcuts import render, redirect
 from django.core.management import call_command, get_commands
 from django.template.response import TemplateResponse
 from django import forms
+import django.db
 
 from .models import (
     Tournament,
@@ -202,11 +203,24 @@ class BracketIQAdminSite(AdminSite):
                 )
                 return redirect("admin:bracket_iq_bracket_changelist")
 
-            except Exception as e:
-                messages.error(request, f"Error: {str(e)}")
-                return TemplateResponse(
-                    request, "admin/bracketiq_admin/generate_brackets.html", context
+            except Tournament.DoesNotExist:
+                messages.error(
+                    request, f"Tournament with ID {tournament_id} does not exist."
                 )
+            except ValueError as e:
+                if "BracketStrategy" in str(e):
+                    messages.error(request, f"Invalid strategy: {strategy}")
+                else:
+                    messages.error(
+                        request, f"Invalid number of brackets: {num_brackets}"
+                    )
+            except django.db.Error as e:
+                messages.error(
+                    request, f"Database error while creating bracket: {str(e)}"
+                )
+            return TemplateResponse(
+                request, "admin/bracketiq_admin/generate_brackets.html", context
+            )
 
         return TemplateResponse(
             request, "admin/bracketiq_admin/generate_brackets.html", context
