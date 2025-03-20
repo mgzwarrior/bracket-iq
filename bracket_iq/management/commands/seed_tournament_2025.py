@@ -19,6 +19,7 @@ ERROR = make_style(fg="red")
 class Command(BaseCommand):
     help = "Seeds the 2025 NCAA Tournament data"
 
+    # pylint: disable=too-many-statements
     def handle(self, *args, **options):
         with transaction.atomic():
             # Get or create the system admin user to own the official bracket
@@ -139,11 +140,15 @@ class Command(BaseCommand):
 
             # Create seeds and initial games
             game_number = 1
-            games_by_round = {}  # Track games by round for easy reference
+            games_by_round: Dict[int, List[Game]] = (
+                {}
+            )  # Track games by round for easy reference
 
             # First, create First Four games
             first_four_games = {}  # Track First Four games by region and seed
-            first_four_start = timezone.make_aware(datetime(2025, 3, 18, 19, 0))  # 7 PM ET start
+            first_four_start = timezone.make_aware(
+                datetime(2025, 3, 18, 19, 0)
+            )  # 7 PM ET start
 
             for team1_name, team2_name, region, seed_num in first_four:
                 # Get teams
@@ -151,7 +156,9 @@ class Command(BaseCommand):
                 team2 = Team.objects.filter(name=team2_name).first()
 
                 if not team1 or not team2:
-                    raise ValueError(f"Could not find teams: {team1_name} or {team2_name}")
+                    raise ValueError(
+                        f"Could not find teams: {team1_name} or {team2_name}"
+                    )
 
                 # Create First Four game with timezone-aware datetime
                 game = Game.objects.create(
@@ -164,25 +171,46 @@ class Command(BaseCommand):
                     team1=team1,
                     seed2=seed_num,
                     team2=team2,
-                    game_date=first_four_start + timedelta(hours=(game_number - 1) * 2.5),
+                    game_date=first_four_start
+                    + timedelta(hours=(game_number - 1) * 2.5),
                 )
                 first_four_games[(region, seed_num)] = game
                 game_number += 1
 
             # Create Round of 64 games
-            round_of_64_start = timezone.make_aware(datetime(2025, 3, 21, 12, 0))  # Start at noon ET on March 21
+            round_of_64_start = timezone.make_aware(
+                datetime(2025, 3, 21, 12, 0)
+            )  # Start at noon ET on March 21
             games_by_round[Round.ROUND_OF_64.value] = []
 
             for region, seeds in region_seeds.items():
                 # Create games in seed order (1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15)
-                matchups = [(1, 16), (8, 9), (5, 12), (4, 13), (6, 11), (3, 14), (7, 10), (2, 15)]
+                matchups = [
+                    (1, 16),
+                    (8, 9),
+                    (5, 12),
+                    (4, 13),
+                    (6, 11),
+                    (3, 14),
+                    (7, 10),
+                    (2, 15),
+                ]
 
                 for seed1, seed2 in matchups:
                     # For seeds involved in First Four games, create placeholder games
-                    if (region, seed1) in first_four_games or (region, seed2) in first_four_games:
-                        ff_game = first_four_games.get((region, seed1)) or first_four_games.get((region, seed2))
+                    if (region, seed1) in first_four_games or (
+                        region,
+                        seed2,
+                    ) in first_four_games:
+                        ff_game = first_four_games.get(
+                            (region, seed1)
+                        ) or first_four_games.get((region, seed2))
                         other_seed = seed1 if seed2 in [11, 16] else seed2
-                        other_team = Team.objects.filter(name=seeds[other_seed]).first() if other_seed in seeds else None
+                        other_team = (
+                            Team.objects.filter(name=seeds[other_seed]).first()
+                            if other_seed in seeds
+                            else None
+                        )
 
                         game = Game.objects.create(
                             tournament=tournament,
@@ -194,16 +222,33 @@ class Command(BaseCommand):
                             team1=other_team if seed1 == other_seed else None,
                             seed2=seed2,
                             team2=other_team if seed2 == other_seed else None,
-                            game_date=round_of_64_start + timedelta(hours=len(games_by_round[Round.ROUND_OF_64.value])),
+                            game_date=round_of_64_start
+                            + timedelta(
+                                hours=len(games_by_round[Round.ROUND_OF_64.value])
+                            ),
                         )
                         ff_game.next_game = game
                         ff_game.save()
                     else:
-                        team1 = Team.objects.filter(name=seeds[seed1]).first() if seed1 in seeds else None
-                        team2 = Team.objects.filter(name=seeds[seed2]).first() if seed2 in seeds else None
+                        team1 = (
+                            Team.objects.filter(name=seeds[seed1]).first()
+                            if seed1 in seeds
+                            else None
+                        )
+                        team2 = (
+                            Team.objects.filter(name=seeds[seed2]).first()
+                            if seed2 in seeds
+                            else None
+                        )
 
-                        if seed1 in seeds and seed2 in seeds and (not team1 or not team2):
-                            raise ValueError(f"Could not find teams for {region} {seed1} vs {seed2}")
+                        if (
+                            seed1 in seeds
+                            and seed2 in seeds
+                            and (not team1 or not team2)
+                        ):
+                            raise ValueError(
+                                f"Could not find teams for {region} {seed1} vs {seed2}"
+                            )
 
                         game = Game.objects.create(
                             tournament=tournament,
@@ -215,7 +260,10 @@ class Command(BaseCommand):
                             team1=team1,
                             seed2=seed2,
                             team2=team2,
-                            game_date=round_of_64_start + timedelta(hours=len(games_by_round[Round.ROUND_OF_64.value])),
+                            game_date=round_of_64_start
+                            + timedelta(
+                                hours=len(games_by_round[Round.ROUND_OF_64.value])
+                            ),
                         )
 
                     games_by_round[Round.ROUND_OF_64.value].append(game)
@@ -226,7 +274,11 @@ class Command(BaseCommand):
             games_by_round[Round.ROUND_OF_32.value] = []
 
             for region in Region:
-                region_games = [g for g in games_by_round[Round.ROUND_OF_64.value] if g.region == region]
+                region_games = [
+                    g
+                    for g in games_by_round[Round.ROUND_OF_64.value]
+                    if g.region == region
+                ]
                 for i in range(0, len(region_games), 2):
                     game = Game.objects.create(
                         tournament=tournament,
@@ -234,7 +286,8 @@ class Command(BaseCommand):
                         region=region,
                         round=Round.ROUND_OF_32.value,
                         game_number=game_number,
-                        game_date=round_of_32_start + timedelta(hours=len(games_by_round[Round.ROUND_OF_32.value])),
+                        game_date=round_of_32_start
+                        + timedelta(hours=len(games_by_round[Round.ROUND_OF_32.value])),
                     )
                     region_games[i].next_game = game
                     region_games[i + 1].next_game = game
@@ -246,7 +299,11 @@ class Command(BaseCommand):
             games_by_round[Round.SWEET_16.value] = []
 
             for region in Region:
-                region_games = [g for g in games_by_round[Round.ROUND_OF_32.value] if g.region == region]
+                region_games = [
+                    g
+                    for g in games_by_round[Round.ROUND_OF_32.value]
+                    if g.region == region
+                ]
                 for i in range(0, len(region_games), 2):
                     game = Game.objects.create(
                         tournament=tournament,
@@ -254,7 +311,8 @@ class Command(BaseCommand):
                         region=region,
                         round=Round.SWEET_16.value,
                         game_number=game_number,
-                        game_date=sweet_16_start + timedelta(hours=len(games_by_round[Round.SWEET_16.value])),
+                        game_date=sweet_16_start
+                        + timedelta(hours=len(games_by_round[Round.SWEET_16.value])),
                     )
                     region_games[i].next_game = game
                     region_games[i + 1].next_game = game
@@ -266,7 +324,11 @@ class Command(BaseCommand):
             games_by_round[Round.ELITE_8.value] = []
 
             for region in Region:
-                region_games = [g for g in games_by_round[Round.SWEET_16.value] if g.region == region]
+                region_games = [
+                    g
+                    for g in games_by_round[Round.SWEET_16.value]
+                    if g.region == region
+                ]
                 for i in range(0, len(region_games), 2):
                     game = Game.objects.create(
                         tournament=tournament,
@@ -274,7 +336,8 @@ class Command(BaseCommand):
                         region=region,
                         round=Round.ELITE_8.value,
                         game_number=game_number,
-                        game_date=elite_8_start + timedelta(hours=len(games_by_round[Round.ELITE_8.value])),
+                        game_date=elite_8_start
+                        + timedelta(hours=len(games_by_round[Round.ELITE_8.value])),
                     )
                     region_games[i].next_game = game
                     region_games[i + 1].next_game = game
@@ -288,19 +351,28 @@ class Command(BaseCommand):
             # Create Final Four games with proper region matchups
             final_four_matchups = [
                 (Region.SOUTH, Region.EAST),
-                (Region.WEST, Region.MIDWEST)
+                (Region.WEST, Region.MIDWEST),
             ]
 
             for region1, region2 in final_four_matchups:
-                region1_game = next(g for g in games_by_round[Round.ELITE_8.value] if g.region == region1)
-                region2_game = next(g for g in games_by_round[Round.ELITE_8.value] if g.region == region2)
+                region1_game = next(
+                    g
+                    for g in games_by_round[Round.ELITE_8.value]
+                    if g.region == region1
+                )
+                region2_game = next(
+                    g
+                    for g in games_by_round[Round.ELITE_8.value]
+                    if g.region == region2
+                )
 
                 game = Game.objects.create(
                     tournament=tournament,
                     bracket=official_bracket,
                     round=Round.FINAL_FOUR.value,
                     game_number=game_number,
-                    game_date=final_four_start + timedelta(hours=len(games_by_round[Round.FINAL_FOUR.value])),
+                    game_date=final_four_start
+                    + timedelta(hours=len(games_by_round[Round.FINAL_FOUR.value])),
                 )
                 region1_game.next_game = game
                 region1_game.save()
