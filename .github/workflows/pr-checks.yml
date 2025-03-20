@@ -14,6 +14,7 @@ jobs:
       NO_DOCKER: 'true'
       PYTHONPATH: ${{ github.workspace }}
       CHECK_ONLY: 'true'  # Ensures the script runs in check mode without modifying files
+      DJANGO_SETTINGS_MODULE: bracket_iq.settings.test
     
     steps:
     - name: Check out repository code
@@ -33,6 +34,7 @@ jobs:
         
     - name: Run code quality checks
       run: |
+        python -c "import django; django.setup()" || true
         ./scripts/check
 
   test:
