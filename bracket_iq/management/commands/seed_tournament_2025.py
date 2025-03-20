@@ -59,7 +59,7 @@ class Command(BaseCommand):
                 ("American University", "Mount St. Mary's", Region.EAST, 16),
                 # Lowest-ranked at-large teams
                 ("Texas", "Xavier", Region.MIDWEST, 11),
-                ("San Diego State", "North Carolina", Region.WEST, 11),
+                ("San Diego State", "North Carolina", Region.SOUTH, 11),
             ]
 
             # Dictionary to store region seeds - sorted numerically 1-16
@@ -213,6 +213,7 @@ class Command(BaseCommand):
                             else None
                         )
 
+                        # Create the Round of 64 game first
                         game = Game.objects.create(
                             tournament=tournament,
                             bracket=official_bracket,
@@ -228,6 +229,7 @@ class Command(BaseCommand):
                                 hours=len(games_by_round[Round.ROUND_OF_64.value])
                             ),
                         )
+                        # Update the First Four game to point to this Round of 64 game
                         ff_game.next_game = game
                         ff_game.save()
                     else:
