@@ -1,5 +1,5 @@
 # bracket_iq/apps.py
-from django.apps import AppConfig
+from django.apps import AppConfig, apps
 from django.conf import settings
 from django.core.management import call_command
 from django.db.models.signals import post_migrate
@@ -29,13 +29,16 @@ class BracketIQConfig(AppConfig):
 
 
 @receiver(post_migrate)
-def seed_initial_data(sender, **kwargs):
-    """Seed initial data after migrations are applied."""
+def seed_initial_data(**kwargs):  # pylint: disable=unused-argument
+    """Seed initial data after migrations are applied.
+
+    Args:
+        **kwargs: Required by Django's signal system but not used
+    """
     try:
-        # Only check for teams after migrations have been applied
-        # Import the model from sender to avoid circular imports
-        Team = sender.get_model("Team") if hasattr(sender, "get_model") else None
-        if Team and not Team.objects.exists():
+        # Get the Team model from our app
+        Team = apps.get_model("bracket_iq", "Team")
+        if not Team.objects.exists():
             call_command("seed_teams")
     except (OperationalError, ProgrammingError):
         # Database isn't ready or table doesn't exist yet
