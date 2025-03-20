@@ -1,4 +1,5 @@
 from unittest import mock
+from datetime import date
 
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
@@ -14,6 +15,7 @@ from ..models import (
     Prediction,
     Round,
     BracketStrategy,
+    Region,
 )
 from ..admin import GameAdmin, GameForm
 
@@ -294,6 +296,78 @@ class GameAdminTests(TestCase):
         self.assertIsNone(self.game1.winner)
         self.assertIsNone(self.game1.score1)
         self.assertIsNone(self.game1.score2)
+
+    def test_ncaa_scoring_methodology(self):
+        """Test that the scoring system follows the NCAA's methodology exactly."""
+        # Create a tournament and teams
+        tournament = Tournament.objects.create(
+            name="Test Tournament",
+            year=2024,
+            start_date=date.today(),
+            end_date=date.today(),
+        )
+
+        teams = {
+            "team1": Team.objects.create(
+                name="Team 1", short_name="T1", mascot="Mascot 1"
+            ),
+            "team2": Team.objects.create(
+                name="Team 2", short_name="T2", mascot="Mascot 2"
+            ),
+            "team3": Team.objects.create(
+                name="Team 3", short_name="T3", mascot="Mascot 3"
+            ),
+            "team4": Team.objects.create(
+                name="Team 4", short_name="T4", mascot="Mascot 4"
+            ),
+        }
+
+        # Create a bracket
+        bracket = Bracket.objects.create(
+            tournament=tournament, user=self.regular_user, name="Test Bracket"
+        )
+
+        # Create games for each round
+        games = {}
+        for round_value, _ in Round.__members__.items():
+            game = Game.objects.create(
+                tournament=tournament,
+                bracket=bracket,
+                round=Round[round_value].value,
+                region=Region.EAST,
+                game_number=1,
+                team1=teams["team1"],
+                team2=teams["team2"],
+                seed1=1,
+                seed2=2,
+            )
+            games[round_value] = game
+
+            # Create a prediction for each game
+            prediction = Prediction.objects.create(
+                bracket=bracket, game=game, predicted_winner=teams["team1"]
+            )
+
+            # Set the winner to match the prediction
+            game.winner = teams["team1"]
+            game.save()
+
+            # Refresh prediction from database to get updated is_correct value
+            prediction.refresh_from_db()
+
+            # Verify points are calculated correctly
+            expected_points = Round.get_points(Round[round_value].value)
+            self.assertEqual(prediction.calculate_points, expected_points)
+
+            # Verify the points are saved
+            prediction.refresh_from_db()
+            self.assertEqual(prediction.points_earned, expected_points)
+            self.assertTrue(prediction.is_correct)
+
+        # Verify total bracket score
+        total_score = 63  # 1 + 2 + 4 + 8 + 16 + 32 points for rounds 1-6
+        bracket.refresh_from_db()  # Refresh bracket to get updated score
+        self.assertEqual(bracket.score, total_score)
 
 
 class AdminSiteTests(TestCase):
