@@ -68,6 +68,9 @@ class BracketStrategy(Enum):
     RANDOM = "RANDOM", "Random Choice"
     HIGHER_SEED = "HIGHER_SEED", "Higher Seed"
     HIGHER_SEED_WITH_UPSETS = "HIGHER_SEED_WITH_UPSETS", "Higher Seed with Upsets"
+    HISTORICAL_ANALYSIS = "HISTORICAL_ANALYSIS", "Historical Tournament Analysis"
+    STATISTICAL_MATCHUP = "STATISTICAL_MATCHUP", "Current Season Stats Analysis"
+    COMPOSITE_AI = "COMPOSITE_AI", "AI Composite Analysis"
 
     def __init__(self, strategy_id, label):
         self.strategy_id = strategy_id
@@ -87,6 +90,45 @@ class BracketStrategy(Enum):
 
     def __str__(self):
         return self.label
+
+    def requires_api_data(self):
+        """Check if this strategy requires external API data."""
+        return self.value in [
+            "HISTORICAL_ANALYSIS",
+            "STATISTICAL_MATCHUP",
+            "COMPOSITE_AI"
+        ]
+
+    def get_required_stats(self):
+        """Return the list of required statistics for this strategy."""
+        if self.value == "STATISTICAL_MATCHUP":
+            return [
+                "scoring-offense",
+                "scoring-defense",
+                "field-goal-percentage",
+                "three-point-percentage",
+                "free-throw-percentage",
+                "rebound-margin",
+                "turnover-margin"
+            ]
+        elif self.value == "HISTORICAL_ANALYSIS":
+            return ["tournament-history", "head-to-head"]
+        elif self.value == "COMPOSITE_AI":
+            # Composite strategy needs all available stats
+            return [
+                "scoring-offense",
+                "scoring-defense",
+                "field-goal-percentage",
+                "three-point-percentage",
+                "free-throw-percentage",
+                "rebound-margin",
+                "turnover-margin",
+                "tournament-history",
+                "head-to-head",
+                "win-loss-record",
+                "strength-of-schedule"
+            ]
+        return []
 
 
 class Tournament(models.Model):
