@@ -409,7 +409,7 @@ def create_prediction(request):
                 next_bracket_game.seed1 = game.seed1
             elif next_bracket_game.team2 is None:
                 next_bracket_game.team2_id = winner_id
-                next_bracket_game.seed1 = game.seed1
+                next_bracket_game.seed2 = game.seed1
         else:
             if next_bracket_game.team1 is None:
                 next_bracket_game.team1_id = winner_id
