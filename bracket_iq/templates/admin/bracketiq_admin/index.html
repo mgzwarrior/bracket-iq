@@ -5,12 +5,22 @@
 <div class="module" style="margin-bottom: 20px;">
     <h2>Tournament Management</h2>
     <div class="description" style="padding: 10px;">
-        <a href="{% url 'admin:seed_tournament' %}" class="button" style="background: var(--button-bg); color: var(--button-fg); padding: 10px 15px; border-radius: 4px; text-decoration: none; display: inline-block; margin-right: 10px;">
-            Seed Tournament
-        </a>
-        <p style="margin-top: 10px;">
-            Use this button to seed a new tournament. This will create all necessary tournament data including teams, regions, and initial matchups.
-        </p>
+        <div style="margin-bottom: 20px;">
+            <a href="{% url 'admin:seed_tournament' %}" class="button" style="background: var(--button-bg); color: var(--button-fg); padding: 10px 15px; border-radius: 4px; text-decoration: none; display: inline-block; margin-right: 10px;">
+                Seed Tournament
+            </a>
+            <p style="margin-top: 10px;">
+                Use this button to seed a new tournament. This will create all necessary tournament data including teams, regions, and initial matchups.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'admin:generate_brackets' %}" class="button" style="background: var(--button-bg); color: var(--button-fg); padding: 10px 15px; border-radius: 4px; text-decoration: none; display: inline-block; margin-right: 10px;">
+                Generate Brackets
+            </a>
+            <p style="margin-top: 10px;">
+                Use this button to automatically generate brackets using different strategies like random picks, higher seeds, or higher seeds with upsets.
+            </p>
+        </div>
     </div>
 </div>
 
