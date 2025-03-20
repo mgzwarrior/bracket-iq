@@ -124,7 +124,10 @@ celerybeat.pid
 .venv
 env/
 venv/
-venv_py*/  # Catches all Python version-specific venvs
+*venv_py*/
+venv_py*/
+venv_py[0-9]*/
+venv_py[0-9].[0-9]*/
 ENV/
 env.bak/
 venv.bak/
