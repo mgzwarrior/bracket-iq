@@ -256,19 +256,6 @@ def fill_bracket(request, bracket_id):
                 # If this game has a next game, update the teams in the next game
                 if game.next_game:
                     next_game = game.next_game
-                    other_game = (
-                        Game.objects.filter(next_game=next_game)
-                        .exclude(id=game.id)
-                        .first()
-                    )
-
-                    other_winner = None
-                    if other_game:
-                        other_pred = Prediction.objects.filter(
-                            bracket=bracket, game=other_game
-                        ).first()
-                        if other_pred:
-                            other_winner = other_pred.predicted_winner
 
                     # Update the next game with the winners
                     if game.team1_id == int(winner_id):
@@ -277,14 +264,6 @@ def fill_bracket(request, bracket_id):
                     else:
                         next_game.team2_id = winner_id
                         next_game.seed2 = game.seed2
-
-                    if other_winner:
-                        if other_game.team1 == other_winner:
-                            next_game.team1 = other_winner
-                            next_game.seed1 = other_game.seed1
-                        else:
-                            next_game.team2 = other_winner
-                            next_game.seed2 = other_game.seed2
 
                     next_game.save()
 
@@ -387,15 +366,6 @@ def create_prediction(request):
             Game.objects.filter(next_game=next_game).exclude(id=game.id).first()
         )
 
-        # Get the other game's prediction if it exists
-        other_winner = None
-        if other_game:
-            other_pred = Prediction.objects.filter(
-                bracket=bracket, game=other_game
-            ).first()
-            if other_pred:
-                other_winner = other_pred.predicted_winner
-
         # Get or create the next bracket game
         next_bracket_game, _ = BracketGame.objects.get_or_create(
             bracket=bracket,
@@ -403,36 +373,34 @@ def create_prediction(request):
         )
 
         # Update the next bracket game's teams based on the predictions
-        if game.team1_id == int(winner_id):
-            if next_bracket_game.team1 is None:
-                next_bracket_game.team1_id = winner_id
-                next_bracket_game.seed1 = game.seed1
-            elif next_bracket_game.team2 is None:
-                next_bracket_game.team2_id = winner_id
-                next_bracket_game.seed2 = game.seed1
-        else:
-            if next_bracket_game.team1 is None:
-                next_bracket_game.team1_id = winner_id
-                next_bracket_game.seed1 = game.seed2
-            elif next_bracket_game.team2 is None:
-                next_bracket_game.team2_id = winner_id
-                next_bracket_game.seed2 = game.seed2
-
-        if other_winner:
-            if other_game.team1 == other_winner:
-                if next_bracket_game.team1 is None:
-                    next_bracket_game.team1 = other_winner
-                    next_bracket_game.seed1 = other_game.seed1
-                elif next_bracket_game.team2 is None:
-                    next_bracket_game.team2 = other_winner
-                    next_bracket_game.seed2 = other_game.seed1
+        # If this game has another game feeding into the same next game,
+        # we need to coordinate which team slot to fill
+        if other_game:
+            # First game in the pair (lower game number) updates team1
+            if game.game_number < other_game.game_number:
+                next_bracket_game.team1 = winner
+                next_bracket_game.team1_seed = (
+                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                )
+            # Second game in the pair (higher game number) updates team2
             else:
-                if next_bracket_game.team1 is None:
-                    next_bracket_game.team1 = other_winner
-                    next_bracket_game.seed1 = other_game.seed2
-                elif next_bracket_game.team2 is None:
-                    next_bracket_game.team2 = other_winner
-                    next_bracket_game.seed2 = other_game.seed2
+                next_bracket_game.team2 = winner
+                next_bracket_game.team2_seed = (
+                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                )
+        else:
+            # If this is the only game feeding into the next game,
+            # update team1 if it's empty, otherwise update team2
+            if next_bracket_game.team1 is None:
+                next_bracket_game.team1 = winner
+                next_bracket_game.team1_seed = (
+                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                )
+            else:
+                next_bracket_game.team2 = winner
+                next_bracket_game.team2_seed = (
+                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                )
 
         next_bracket_game.save()
 

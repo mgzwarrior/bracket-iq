@@ -303,5 +303,5 @@ class BracketGame(models.Model):
     def __str__(self):
         team1_name = self.team1.name if self.team1 else "TBD"
         team2_name = self.team2.name if self.team2 else "TBD"
-        game_number = getattr(self.game, 'game_number', 'Unknown')
+        game_number = getattr(self.game, "game_number", "Unknown")
         return f"{self.bracket.name} - Game {game_number}: {team1_name} vs {team2_name}"
