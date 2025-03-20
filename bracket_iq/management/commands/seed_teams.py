@@ -286,6 +286,7 @@ class Command(BaseCommand):
             "Southeastern Louisiana": ("SE Louisiana", "Lions"),
             "Southern": ("Southern", "Jaguars"),
             "Southern Illinois": ("SIU", "Salukis"),
+            "Southern Illinois Edwardsville": ("SIUE", "Cougars"),
             "Southern Miss": ("Southern Miss", "Golden Eagles"),
             "Southern Utah": ("SUU", "Thunderbirds"),
             "St. Bonaventure": ("St Bona", "Bonnies"),

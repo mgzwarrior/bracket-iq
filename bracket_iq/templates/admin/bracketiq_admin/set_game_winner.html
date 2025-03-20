@@ -59,7 +59,7 @@
             <div>
                 <button type="button" id="team-{{ game.id }}-{{ game.team1.id }}" 
                         class="button btn-winner {% if game.winner == game.team1 %}selected{% endif %}"
-                        onclick="selectWinner('{{ game.id }}', '{{ game.team1.id }}', '{{ game.team1.name }}')">
+                        onclick="selectWinner('{{ game.id }}', '{{ game.team1.id }}', '{{ game.team1.name|escapejs }}')">
                     Select {{ game.team1.name }} as winner
                 </button>
             </div>
@@ -74,7 +74,7 @@
             <div>
                 <button type="button" id="team-{{ game.id }}-{{ game.team2.id }}" 
                         class="button btn-winner {% if game.winner == game.team2 %}selected{% endif %}"
-                        onclick="selectWinner('{{ game.id }}', '{{ game.team2.id }}', '{{ game.team2.name }}')">
+                        onclick="selectWinner('{{ game.id }}', '{{ game.team2.id }}', '{{ game.team2.name|escapejs }}')">
                     Select {{ game.team2.name }} as winner
                 </button>
             </div>

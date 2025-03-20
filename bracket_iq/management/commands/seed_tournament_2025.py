@@ -70,7 +70,7 @@ class Command(BaseCommand):
                     3: "Iowa State",
                     4: "Texas A&M",
                     5: "Michigan",
-                    6: "Ole Miss",
+                    6: "Mississippi",
                     7: "Marquette",
                     8: "Louisville",
                     9: "Creighton",
@@ -108,14 +108,14 @@ class Command(BaseCommand):
                     5: "Memphis",
                     6: "Missouri",
                     7: "Kansas",
-                    8: "UConn",
+                    8: "Connecticut",
                     9: "Oklahoma",
                     10: "Arkansas",
                     11: "Drake",
                     12: "Colorado State",
                     13: "Grand Canyon",
                     14: "UNC Wilmington",
-                    15: "Omaha",
+                    15: "Nebraska Omaha",
                     16: "Norfolk State",
                 },
                 Region.MIDWEST: {
@@ -130,11 +130,11 @@ class Command(BaseCommand):
                     9: "Georgia",
                     10: "Utah State",
                     11: "Texas/Xavier",  # First Four
-                    12: "McNeese",
+                    12: "McNeese State",
                     13: "High Point",
                     14: "Troy",
                     15: "Wofford",
-                    16: "SIU Edwardsville",
+                    16: "Southern Illinois Edwardsville",
                 },
             }
 
@@ -209,6 +209,7 @@ class Command(BaseCommand):
                         other_team = (
                             Team.objects.filter(name=seeds[other_seed]).first()
                             if other_seed in seeds
+                            and "/" not in seeds[other_seed]  # Skip First Four teams
                             else None
                         )
 
@@ -233,19 +234,24 @@ class Command(BaseCommand):
                         team1 = (
                             Team.objects.filter(name=seeds[seed1]).first()
                             if seed1 in seeds
+                            and "/" not in seeds[seed1]  # Skip First Four teams
                             else None
                         )
                         team2 = (
                             Team.objects.filter(name=seeds[seed2]).first()
                             if seed2 in seeds
+                            and "/" not in seeds[seed2]  # Skip First Four teams
                             else None
                         )
 
-                        if (
-                            seed1 in seeds
-                            and seed2 in seeds
-                            and (not team1 or not team2)
-                        ):
+                        # Check if both seeds exist and are not First Four teams
+                        seeds_exist = seed1 in seeds and seed2 in seeds
+                        not_first_four = (
+                            "/" not in seeds[seed1] and "/" not in seeds[seed2]
+                        )
+                        teams_missing = not team1 or not team2
+
+                        if seeds_exist and not_first_four and teams_missing:
                             raise ValueError(
                                 f"Could not find teams for {region} {seed1} vs {seed2}"
                             )
@@ -280,6 +286,10 @@ class Command(BaseCommand):
                     if g.region == region
                 ]
                 for i in range(0, len(region_games), 2):
+                    # Get the Round of 64 games that will feed into this game
+                    game1 = region_games[i]
+                    game2 = region_games[i + 1]
+
                     game = Game.objects.create(
                         tournament=tournament,
                         bracket=official_bracket,
@@ -289,8 +299,8 @@ class Command(BaseCommand):
                         game_date=round_of_32_start
                         + timedelta(hours=len(games_by_round[Round.ROUND_OF_32.value])),
                     )
-                    region_games[i].next_game = game
-                    region_games[i + 1].next_game = game
+                    game1.next_game = game
+                    game2.next_game = game
                     games_by_round[Round.ROUND_OF_32.value].append(game)
                     game_number += 1
 

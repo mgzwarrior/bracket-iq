@@ -153,7 +153,7 @@ class Game(models.Model):
     )
     region: models.CharField = models.CharField(max_length=20, choices=Region.choices)
     game_number: models.IntegerField = models.IntegerField()
-    seed1: models.IntegerField = models.IntegerField()
+    seed1: models.IntegerField = models.IntegerField(null=True, blank=True)
     team1: models.ForeignKey = models.ForeignKey(
         Team,
         related_name="team1_games",
@@ -161,7 +161,7 @@ class Game(models.Model):
         null=True,
         blank=True,
     )
-    seed2: models.IntegerField = models.IntegerField()
+    seed2: models.IntegerField = models.IntegerField(null=True, blank=True)
     team2: models.ForeignKey = models.ForeignKey(
         Team,
         related_name="team2_games",
