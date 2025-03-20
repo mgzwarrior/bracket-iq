@@ -371,8 +371,8 @@ class Command(BaseCommand):
 
             # Create Final Four games with proper region matchups
             final_four_matchups = [
-                (Region.SOUTH, Region.EAST),
-                (Region.WEST, Region.MIDWEST),
+                (Region.SOUTH, Region.WEST),
+                (Region.EAST, Region.MIDWEST),
             ]
 
             for region1, region2 in final_four_matchups:
