@@ -1,13 +1,14 @@
 import datetime
 import re
 
-from django.contrib import admin
-from django.contrib.admin import AdminSite
-from django.contrib import messages
+from django.contrib import admin, messages
+from django.contrib.admin import AdminSite, SimpleListFilter
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.core.management import call_command, get_commands
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
 from django.urls import path
+from django import forms
 
 from .models import Tournament, Team, Game, Bracket, Prediction
 
@@ -83,17 +84,52 @@ class BracketIQAdminSite(AdminSite):
         )
 
 
+class GameForm(forms.ModelForm):
+    """Custom form for Game model that limits winner choices to the two teams playing"""
+
+    class Meta:
+        model = Game
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # If this is an existing game with both teams set, limit winner choices
+        if (
+            self.instance
+            and self.instance.pk
+            and self.instance.team1
+            and self.instance.team2
+        ):
+            self.fields["winner"].queryset = Team.objects.filter(
+                pk__in=[self.instance.team1.pk, self.instance.team2.pk]
+            )
+            self.fields["winner"].help_text = "Select the winner of this game."
+
+            # Label score fields with team names
+            self.fields["score1"].label = f"{self.instance.team1.name} Score"
+            self.fields["score2"].label = f"{self.instance.team2.name} Score"
+        else:
+            self.fields["winner"].queryset = Team.objects.none()
+            self.fields["winner"].help_text = (
+                "Save the game with both teams first, then select a winner."
+            )
+
+
 class GameInline(admin.TabularInline):
     model = Game
+    form = GameForm
     fields = (
         "round",
         "region",
         "game_number",
         "team1",
-        "team2",
-        "winner",
+        "seed1",
         "score1",
+        "team2",
+        "seed2",
         "score2",
+        "winner",
         "game_date",
     )
     readonly_fields = ("game_number",)
@@ -120,8 +156,27 @@ class TournamentAdmin(admin.ModelAdmin):
     games_completed.short_description = "Games Completed"
 
 
+class HasWinnerFilter(SimpleListFilter):
+    title = "has winner"
+    parameter_name = "has_winner"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("yes", "Yes"),
+            ("no", "No"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(winner__isnull=False)
+        if self.value() == "no":
+            return queryset.filter(winner__isnull=True)
+        return queryset
+
+
 @admin.register(Game)
 class GameAdmin(admin.ModelAdmin):
+    form = GameForm
     list_display = (
         "tournament",
         "round",
@@ -130,11 +185,42 @@ class GameAdmin(admin.ModelAdmin):
         "matchup",
         "score_display",
         "winner_display",
+        "status",
         "game_date",
     )
-    list_filter = ("tournament", "round", "region")
+    list_filter = ("tournament", "round", "region", HasWinnerFilter)
     search_fields = ("team1__name", "team2__name")
     readonly_fields = ("game_number",)
+    actions = ["set_game_winner"]
+
+    fieldsets = [
+        (
+            "Game Information",
+            {
+                "fields": [
+                    "tournament",
+                    "round",
+                    "region",
+                    "game_number",
+                    "game_date",
+                    "next_game",
+                ],
+            },
+        ),
+        (
+            "Teams",
+            {
+                "fields": [("team1", "seed1", "score1"), ("team2", "seed2", "score2")],
+            },
+        ),
+        (
+            "Result",
+            {
+                "fields": ["winner"],
+                "classes": ["wide"],
+            },
+        ),
+    ]
 
     def matchup(self, obj):
         if obj.team1 and obj.team2:
@@ -157,6 +243,124 @@ class GameAdmin(admin.ModelAdmin):
     winner_display.short_description = "Winner"
     winner_display.admin_order_field = "winner"
 
+    def status(self, obj):
+        if not obj.team1 or not obj.team2:
+            return "Waiting for teams"
+        if obj.winner:
+            return "Completed"
+        return "Needs winner"
+
+    status.short_description = "Status"
+
+    def set_game_winner(self, request, queryset):
+        """Admin action to easily set game winners"""
+        if "apply" not in request.POST:
+            # Display the winner selection form
+            valid_games = [game for game in queryset if game.team1 and game.team2]
+
+            if not valid_games:
+                self.message_user(
+                    request,
+                    "No valid games selected. Games must have both teams defined.",
+                    messages.ERROR,
+                )
+                return None
+
+            context = {
+                "title": "Choose Game Winner",
+                "queryset": valid_games,
+                "action_checkbox_name": ACTION_CHECKBOX_NAME,
+            }
+            return render(
+                request,
+                "admin/bracketiq_admin/set_game_winner.html",
+                context,
+            )
+
+        # Process the winner selection
+        success_messages = []
+        error_messages = []
+
+        for game_id, winner_id in request.POST.items():
+            if not game_id.startswith("winner_"):
+                continue
+
+            game_id = game_id.replace("winner_", "")
+            if not winner_id:
+                continue
+
+            try:
+                game = Game.objects.get(id=game_id)
+                winner = Team.objects.get(id=winner_id)
+
+                # Get scores if provided
+                score1 = request.POST.get(f"score1_{game_id}")
+                score2 = request.POST.get(f"score2_{game_id}")
+
+                if score1 and score2:
+                    try:
+                        game.score1 = int(score1)
+                        game.score2 = int(score2)
+                    except ValueError:
+                        error_messages.append(
+                            f"Error processing game {game.game_number}: Invalid scores"
+                        )
+                        continue
+
+                # Set winner and update the game
+                game.winner = winner
+                self._update_next_game(game, winner)
+                game.save()
+
+                # Update predictions for this game
+                self._update_predictions(game)
+
+                winner_name = winner.name
+                success_messages.append(
+                    f"Set {winner_name} as winner for Game {game.game_number}"
+                )
+            except (Game.DoesNotExist, Team.DoesNotExist, ValueError) as e:
+                error_messages.append(f"Error processing game {game_id}: {str(e)}")
+
+        # Display messages
+        if success_messages:
+            self.message_user(request, ", ".join(success_messages))
+        if error_messages:
+            self.message_user(request, ", ".join(error_messages), level=messages.ERROR)
+
+        # Always return a response
+        return None
+
+    set_game_winner.short_description = "Set game winner"
+
+    def _update_next_game(self, game, winner):
+        """Helper method to update the next game with the winner of the current game."""
+        if not game.next_game:
+            return
+
+        next_game = game.next_game
+        seed = game.seed1 if winner == game.team1 else game.seed2
+
+        if next_game.team1 is None:
+            next_game.team1 = winner
+            next_game.seed1 = seed
+        else:
+            next_game.team2 = winner
+            next_game.seed2 = seed
+
+        next_game.save()
+
+    def _update_predictions(self, game):
+        """Helper method to update predictions based on the game result."""
+        if not game.winner:
+            return
+
+        # Update predictions for accuracy
+        for prediction in Prediction.objects.filter(game=game):
+            prediction.is_correct = prediction.predicted_winner == game.winner
+            prediction.points_earned = prediction.calculate_points
+            prediction.save()
+
     def save_model(self, request, obj, form, change):
         """
         When a game's winner is updated, update any games that this game
@@ -166,20 +370,11 @@ class GameAdmin(admin.ModelAdmin):
 
         # If the winner changed and this game feeds into another game
         if "winner" in form.changed_data and obj.next_game:
-            # Update the next game with this winner
-            next_game = obj.next_game
-            if next_game.team1 is None:
-                next_game.team1 = obj.winner
-                next_game.seed1 = obj.seed1 if obj.winner == obj.team1 else obj.seed2
-            else:
-                next_game.team2 = obj.winner
-                next_game.seed2 = obj.seed1 if obj.winner == obj.team1 else obj.seed2
-            next_game.save()
+            self._update_next_game(obj, obj.winner)
 
-            # Update predictions for accuracy
-            for prediction in Prediction.objects.filter(game=obj):
-                prediction.is_correct = prediction.predicted_winner == obj.winner
-                prediction.save()
+        # If the winner changed, update predictions for this game
+        if "winner" in form.changed_data and obj.winner:
+            self._update_predictions(obj)
 
 
 @admin.register(Team)

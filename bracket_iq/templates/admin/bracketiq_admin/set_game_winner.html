@@ -1,0 +1,124 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <script type="text/javascript">
+        function selectWinner(gameId, teamId, teamName) {
+            // Set hidden input value
+            var input = document.getElementById('winner_' + gameId);
+            if (input) {
+                input.value = teamId;
+            }
+            
+            // Update selection text
+            var display = document.getElementById('selection-' + gameId);
+            if (display) {
+                display.textContent = 'Selected: ' + teamName;
+                display.style.display = 'block';
+            }
+            
+            // Update the visual selection indicator on buttons
+            var buttons = document.querySelectorAll('.game-' + gameId + ' .btn-winner');
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove('selected');
+            }
+            
+            var selectedBtn = document.getElementById('team-' + gameId + '-' + teamId);
+            if (selectedBtn) {
+                selectedBtn.classList.add('selected');
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label='bracket_iq' %}">Bracket IQ</a>
+    &rsaquo; <a href="{% url 'admin:bracket_iq_game_changelist' %}">Games</a>
+    &rsaquo; Set Game Winners
+</div>
+{% endblock %}
+
+{% block content %}
+<p>Select the winner for each game below and enter the final scores:</p>
+
+<form method="post">
+    {% csrf_token %}
+    
+    {% for game in queryset %}
+    <div class="module aligned game-{{ game.id }}">
+        <h2>Game {{ game.game_number }}: {{ game.region }} Region, Round {{ game.round }}</h2>
+        <p>
+            <strong>{{ game.team1.name }}</strong> ({{ game.seed1 }}) vs. 
+            <strong>{{ game.team2.name }}</strong> ({{ game.seed2 }})
+        </p>
+        
+        <div class="form-row">
+            <div>
+                <button type="button" id="team-{{ game.id }}-{{ game.team1.id }}" 
+                        class="button btn-winner {% if game.winner == game.team1 %}selected{% endif %}"
+                        onclick="selectWinner('{{ game.id }}', '{{ game.team1.id }}', '{{ game.team1.name }}')">
+                    Select {{ game.team1.name }} as winner
+                </button>
+            </div>
+            <div>
+                <label for="score1_{{ game.id }}">{{ game.team1.name }} Score:</label>
+                <input type="number" min="0" id="score1_{{ game.id }}" name="score1_{{ game.id }}" 
+                       value="{% if game.score1 is not None %}{{ game.score1 }}{% endif %}">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div>
+                <button type="button" id="team-{{ game.id }}-{{ game.team2.id }}" 
+                        class="button btn-winner {% if game.winner == game.team2 %}selected{% endif %}"
+                        onclick="selectWinner('{{ game.id }}', '{{ game.team2.id }}', '{{ game.team2.name }}')">
+                    Select {{ game.team2.name }} as winner
+                </button>
+            </div>
+            <div>
+                <label for="score2_{{ game.id }}">{{ game.team2.name }} Score:</label>
+                <input type="number" min="0" id="score2_{{ game.id }}" name="score2_{{ game.id }}" 
+                       value="{% if game.score2 is not None %}{{ game.score2 }}{% endif %}">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <p id="selection-{{ game.id }}" class="help" {% if not game.winner %}style="display: none;"{% endif %}>
+                {% if game.winner %}
+                    Selected: {{ game.winner.name }}
+                {% else %}
+                    No winner selected
+                {% endif %}
+            </p>
+        </div>
+        
+        <input type="hidden" id="winner_{{ game.id }}" name="winner_{{ game.id }}" 
+               value="{% if game.winner %}{{ game.winner.id }}{% endif %}">
+    </div>
+    {% endfor %}
+    
+    <input type="hidden" name="action" value="set_game_winner">
+    <input type="hidden" name="apply" value="1">
+    {% for obj in queryset %}
+    <input type="hidden" name="_selected_action" value="{{ obj.pk }}">
+    {% endfor %}
+    
+    <div class="submit-row">
+        <input type="submit" value="Save Winners & Scores" class="default">
+        <a href="{% url 'admin:bracket_iq_game_changelist' %}" class="button cancel-link">Cancel</a>
+    </div>
+</form>
+
+<style>
+    .button.btn-winner {
+        margin: 5px 0;
+    }
+    .button.selected {
+        background: #417690;
+        color: white;
+    }
+</style>
+{% endblock %} 
