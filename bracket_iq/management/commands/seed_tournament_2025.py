@@ -61,83 +61,89 @@ class Command(BaseCommand):
                 ("San Diego State", "North Carolina", Region.WEST, 11),
             ]
 
-            # Dictionary to store region seeds - removed seeds where First Four games will determine them
+            # Dictionary to store region seeds - sorted numerically 1-16
             region_seeds = {
                 Region.SOUTH: {
                     1: "Auburn",
+                    2: "Michigan State",
+                    3: "Iowa State",
+                    4: "Texas A&M",
+                    5: "Michigan",
+                    6: "Ole Miss",
+                    7: "Marquette",
                     8: "Louisville",
                     9: "Creighton",
-                    5: "Michigan",
-                    12: "UC San Diego",
-                    4: "Texas A&M",
-                    13: "Yale",
-                    6: "Mississippi",
-                    3: "Iowa State",
-                    14: "Lipscomb",
-                    7: "Marquette",
                     10: "New Mexico",
-                    2: "Michigan State",
+                    11: "San Diego State/North Carolina",  # First Four
+                    12: "UC San Diego",
+                    13: "Yale",
+                    14: "Lipscomb",
                     15: "Bryant",
+                    16: "Alabama State/Saint Francis",  # First Four
                 },
                 Region.EAST: {
                     1: "Duke",
+                    2: "Alabama",
+                    3: "Wisconsin",
+                    4: "Arizona",
+                    5: "Oregon",
+                    6: "BYU",
+                    7: "Saint Mary's",
                     8: "Mississippi State",
                     9: "Baylor",
-                    5: "Oregon",
-                    12: "Liberty",
-                    4: "Arizona",
-                    13: "Akron",
-                    6: "BYU",
-                    11: "VCU",
-                    3: "Wisconsin",
-                    14: "Montana",
-                    7: "Saint Mary's",
                     10: "Vanderbilt",
-                    2: "Alabama",
+                    11: "VCU",
+                    12: "Liberty",
+                    13: "Akron",
+                    14: "Montana",
                     15: "Robert Morris",
+                    16: "American/Mount St. Mary's",  # First Four
                 },
                 Region.WEST: {
                     1: "Florida",
-                    8: "Connecticut",
-                    9: "Oklahoma",
-                    5: "Memphis",
-                    12: "Colorado State",
-                    4: "Maryland",
-                    13: "Grand Canyon",
-                    6: "Missouri",
-                    3: "Texas Tech",
-                    14: "UNC Wilmington",
-                    7: "Kansas",
-                    10: "Arkansas",
                     2: "St. John's",
-                    15: "Nebraska Omaha",
+                    3: "Texas Tech",
+                    4: "Maryland",
+                    5: "Memphis",
+                    6: "Missouri",
+                    7: "Kansas",
+                    8: "UConn",
+                    9: "Oklahoma",
+                    10: "Arkansas",
+                    11: "Drake",
+                    12: "Colorado State",
+                    13: "Grand Canyon",
+                    14: "UNC Wilmington",
+                    15: "Omaha",
+                    16: "Norfolk State",
                 },
                 Region.MIDWEST: {
                     1: "Houston",
+                    2: "Tennessee",
+                    3: "Kentucky",
+                    4: "Purdue",
+                    5: "Clemson",
+                    6: "Illinois",
+                    7: "UCLA",
                     8: "Gonzaga",
                     9: "Georgia",
-                    5: "Clemson",
-                    12: "McNeese State",
-                    4: "Purdue",
-                    13: "High Point",
-                    6: "Illinois",
-                    3: "Kentucky",
-                    14: "Troy",
-                    7: "UCLA",
                     10: "Utah State",
-                    2: "Tennessee",
+                    11: "Texas/Xavier",  # First Four
+                    12: "McNeese",
+                    13: "High Point",
+                    14: "Troy",
                     15: "Wofford",
+                    16: "SIU Edwardsville",
                 },
             }
 
             # Create seeds and initial games
             game_number = 1
+            games_by_round = {}  # Track games by round for easy reference
 
             # First, create First Four games
             first_four_games = {}  # Track First Four games by region and seed
-            first_four_start = timezone.make_aware(
-                datetime(2025, 3, 18, 19, 0)
-            )  # 7 PM ET start
+            first_four_start = timezone.make_aware(datetime(2025, 3, 18, 19, 0))  # 7 PM ET start
 
             for team1_name, team2_name, region, seed_num in first_four:
                 # Get teams
@@ -145,9 +151,7 @@ class Command(BaseCommand):
                 team2 = Team.objects.filter(name=team2_name).first()
 
                 if not team1 or not team2:
-                    raise ValueError(
-                        f"Could not find teams: {team1_name} or {team2_name}"
-                    )
+                    raise ValueError(f"Could not find teams: {team1_name} or {team2_name}")
 
                 # Create First Four game with timezone-aware datetime
                 game = Game.objects.create(
@@ -160,58 +164,26 @@ class Command(BaseCommand):
                     team1=team1,
                     seed2=seed_num,
                     team2=team2,
-                    game_date=first_four_start
-                    + timedelta(
-                        hours=(game_number - 1) * 2.5
-                    ),  # Games staggered by 2.5 hours
+                    game_date=first_four_start + timedelta(hours=(game_number - 1) * 2.5),
                 )
                 first_four_games[(region, seed_num)] = game
                 game_number += 1
 
-            # Create first round (Round of 64) games
-            round_of_64_start = timezone.make_aware(
-                datetime(2025, 3, 21, 12, 0)
-            )  # Start at noon ET on March 21
-            # Initialize games_per_region with actual Region values
-            games_per_region: Dict[Region, List[Game]] = {
-                Region.SOUTH: [],
-                Region.EAST: [],
-                Region.MIDWEST: [],
-                Region.WEST: [],
-            }
+            # Create Round of 64 games
+            round_of_64_start = timezone.make_aware(datetime(2025, 3, 21, 12, 0))  # Start at noon ET on March 21
+            games_by_round[Round.ROUND_OF_64.value] = []
 
             for region, seeds in region_seeds.items():
                 # Create games in seed order (1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15)
-                matchups = [
-                    (1, 16),
-                    (8, 9),
-                    (5, 12),
-                    (4, 13),
-                    (6, 11),
-                    (3, 14),
-                    (7, 10),
-                    (2, 15),
-                ]
+                matchups = [(1, 16), (8, 9), (5, 12), (4, 13), (6, 11), (3, 14), (7, 10), (2, 15)]
 
                 for seed1, seed2 in matchups:
                     # For seeds involved in First Four games, create placeholder games
-                    if (region, seed1) in first_four_games or (
-                        region,
-                        seed2,
-                    ) in first_four_games:
-                        # Get the First Four game
-                        ff_game = first_four_games.get(
-                            (region, seed1)
-                        ) or first_four_games.get((region, seed2))
-                        # Get the non-First Four team
+                    if (region, seed1) in first_four_games or (region, seed2) in first_four_games:
+                        ff_game = first_four_games.get((region, seed1)) or first_four_games.get((region, seed2))
                         other_seed = seed1 if seed2 in [11, 16] else seed2
-                        other_team = (
-                            Team.objects.filter(name=seeds[other_seed]).first()
-                            if other_seed in seeds
-                            else None
-                        )
+                        other_team = Team.objects.filter(name=seeds[other_seed]).first() if other_seed in seeds else None
 
-                        # Create the Round of 64 game with the known team
                         game = Game.objects.create(
                             tournament=tournament,
                             bracket=official_bracket,
@@ -222,33 +194,16 @@ class Command(BaseCommand):
                             team1=other_team if seed1 == other_seed else None,
                             seed2=seed2,
                             team2=other_team if seed2 == other_seed else None,
-                            game_date=round_of_64_start
-                            + timedelta(hours=len(games_per_region[region])),
+                            game_date=round_of_64_start + timedelta(hours=len(games_by_round[Round.ROUND_OF_64.value])),
                         )
-                        # Link the First Four game to this game
                         ff_game.next_game = game
                         ff_game.save()
                     else:
-                        # Regular matchup - check if both teams are in the seeds dictionary
-                        team1 = (
-                            Team.objects.filter(name=seeds[seed1]).first()
-                            if seed1 in seeds
-                            else None
-                        )
-                        team2 = (
-                            Team.objects.filter(name=seeds[seed2]).first()
-                            if seed2 in seeds
-                            else None
-                        )
+                        team1 = Team.objects.filter(name=seeds[seed1]).first() if seed1 in seeds else None
+                        team2 = Team.objects.filter(name=seeds[seed2]).first() if seed2 in seeds else None
 
-                        if (
-                            seed1 in seeds
-                            and seed2 in seeds
-                            and (not team1 or not team2)
-                        ):
-                            raise ValueError(
-                                f"Could not find teams for {region} {seed1} vs {seed2}"
-                            )
+                        if seed1 in seeds and seed2 in seeds and (not team1 or not team2):
+                            raise ValueError(f"Could not find teams for {region} {seed1} vs {seed2}")
 
                         game = Game.objects.create(
                             tournament=tournament,
@@ -260,11 +215,113 @@ class Command(BaseCommand):
                             team1=team1,
                             seed2=seed2,
                             team2=team2,
-                            game_date=round_of_64_start
-                            + timedelta(hours=len(games_per_region[region])),
+                            game_date=round_of_64_start + timedelta(hours=len(games_by_round[Round.ROUND_OF_64.value])),
                         )
 
-                    games_per_region[region].append(game)
+                    games_by_round[Round.ROUND_OF_64.value].append(game)
                     game_number += 1
+
+            # Create Round of 32 games
+            round_of_32_start = timezone.make_aware(datetime(2025, 3, 23, 12, 0))
+            games_by_round[Round.ROUND_OF_32.value] = []
+
+            for region in Region:
+                region_games = [g for g in games_by_round[Round.ROUND_OF_64.value] if g.region == region]
+                for i in range(0, len(region_games), 2):
+                    game = Game.objects.create(
+                        tournament=tournament,
+                        bracket=official_bracket,
+                        region=region,
+                        round=Round.ROUND_OF_32.value,
+                        game_number=game_number,
+                        game_date=round_of_32_start + timedelta(hours=len(games_by_round[Round.ROUND_OF_32.value])),
+                    )
+                    region_games[i].next_game = game
+                    region_games[i + 1].next_game = game
+                    games_by_round[Round.ROUND_OF_32.value].append(game)
+                    game_number += 1
+
+            # Create Sweet 16 games
+            sweet_16_start = timezone.make_aware(datetime(2025, 3, 28, 19, 0))
+            games_by_round[Round.SWEET_16.value] = []
+
+            for region in Region:
+                region_games = [g for g in games_by_round[Round.ROUND_OF_32.value] if g.region == region]
+                for i in range(0, len(region_games), 2):
+                    game = Game.objects.create(
+                        tournament=tournament,
+                        bracket=official_bracket,
+                        region=region,
+                        round=Round.SWEET_16.value,
+                        game_number=game_number,
+                        game_date=sweet_16_start + timedelta(hours=len(games_by_round[Round.SWEET_16.value])),
+                    )
+                    region_games[i].next_game = game
+                    region_games[i + 1].next_game = game
+                    games_by_round[Round.SWEET_16.value].append(game)
+                    game_number += 1
+
+            # Create Elite 8 games
+            elite_8_start = timezone.make_aware(datetime(2025, 3, 30, 19, 0))
+            games_by_round[Round.ELITE_8.value] = []
+
+            for region in Region:
+                region_games = [g for g in games_by_round[Round.SWEET_16.value] if g.region == region]
+                for i in range(0, len(region_games), 2):
+                    game = Game.objects.create(
+                        tournament=tournament,
+                        bracket=official_bracket,
+                        region=region,
+                        round=Round.ELITE_8.value,
+                        game_number=game_number,
+                        game_date=elite_8_start + timedelta(hours=len(games_by_round[Round.ELITE_8.value])),
+                    )
+                    region_games[i].next_game = game
+                    region_games[i + 1].next_game = game
+                    games_by_round[Round.ELITE_8.value].append(game)
+                    game_number += 1
+
+            # Create Final Four games
+            final_four_start = timezone.make_aware(datetime(2025, 4, 5, 19, 0))
+            games_by_round[Round.FINAL_FOUR.value] = []
+
+            # Create Final Four games with proper region matchups
+            final_four_matchups = [
+                (Region.SOUTH, Region.EAST),
+                (Region.WEST, Region.MIDWEST)
+            ]
+
+            for region1, region2 in final_four_matchups:
+                region1_game = next(g for g in games_by_round[Round.ELITE_8.value] if g.region == region1)
+                region2_game = next(g for g in games_by_round[Round.ELITE_8.value] if g.region == region2)
+
+                game = Game.objects.create(
+                    tournament=tournament,
+                    bracket=official_bracket,
+                    round=Round.FINAL_FOUR.value,
+                    game_number=game_number,
+                    game_date=final_four_start + timedelta(hours=len(games_by_round[Round.FINAL_FOUR.value])),
+                )
+                region1_game.next_game = game
+                region1_game.save()
+                region2_game.next_game = game
+                region2_game.save()
+                games_by_round[Round.FINAL_FOUR.value].append(game)
+                game_number += 1
+
+            # Create Championship game
+            championship_start = timezone.make_aware(datetime(2025, 4, 7, 21, 0))
+            championship = Game.objects.create(
+                tournament=tournament,
+                bracket=official_bracket,
+                round=Round.CHAMPIONSHIP.value,
+                game_number=game_number,
+                game_date=championship_start,
+            )
+
+            # Link Final Four games to Championship
+            for game in games_by_round[Round.FINAL_FOUR.value]:
+                game.next_game = championship
+                game.save()
 
             self.stdout.write(SUCCESS("Successfully seeded 2025 tournament data"))
