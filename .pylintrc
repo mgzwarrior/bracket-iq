@@ -1,0 +1,17 @@
+[MASTER]
+load-plugins=pylint_django
+
+[FORMAT]
+max-line-length=120
+
+[MESSAGES CONTROL]
+disable=C0111,R0903,C0103
+
+[DJANGO]
+django-settings-module=bracket_iq.settings.test
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,id,fd,fp
+
+[TYPECHECK]
+generated-members=REQUEST,acl_users,aq_parent,objects,_meta,id 
