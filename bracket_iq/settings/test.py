@@ -61,15 +61,27 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "bracket_iq.wsgi.application"
 
-# Database
-# Use PostgreSQL for tests to match Docker environment
+# Determine the database host based on environment
+# Default to 'localhost' for local development
+# Use 'db' when running in Docker
+# Can be overridden by TEST_DB_HOST environment variable
+DB_HOST = os.environ.get("TEST_DB_HOST")
+if DB_HOST is None:
+    if os.environ.get("DOCKER_CONTAINER") == "true":
+        DB_HOST = "db"
+    elif os.environ.get("GITHUB_ACTIONS") == "true":
+        DB_HOST = "localhost"
+    else:
+        DB_HOST = "localhost"
+
+# Database configuration
 DATABASES = {
     "default": {
         "ENGINE": os.environ.get("TEST_DB_ENGINE", "django.db.backends.postgresql"),
         "NAME": os.environ.get("TEST_DB_NAME", "bracket_iq"),
         "USER": os.environ.get("TEST_DB_USER", "postgres"),
         "PASSWORD": os.environ.get("TEST_DB_PASSWORD", "postgres"),
-        "HOST": os.environ.get("TEST_DB_HOST", "db"),
+        "HOST": DB_HOST,
         "PORT": os.environ.get("TEST_DB_PORT", "5432"),
     }
 }

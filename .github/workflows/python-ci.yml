@@ -7,22 +7,38 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bracket_iq
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       NO_ENV_FILE: 'true'
       DEV_DOCKER_WORKFLOW: 'none'
-      TEST_DB_ENGINE: 'django.db.backends.sqlite3'
-      TEST_DB_NAME: ':memory:'
-      TEST_DB_USER: ''
-      TEST_DB_PASSWORD: ''
-      TEST_DB_HOST: ''
-      TEST_DB_PORT: ''
+      TEST_DB_ENGINE: 'django.db.backends.postgresql'
+      TEST_DB_NAME: 'bracket_iq'
+      TEST_DB_USER: 'postgres'
+      TEST_DB_PASSWORD: 'postgres'
+      TEST_DB_HOST: 'localhost'
+      TEST_DB_PORT: '5432'
       NO_DOCKER: 'true'
       PYTHONPATH: ${{ github.workspace }}
       DJANGO_SETTINGS_MODULE: bracket_iq.settings.test
     
     strategy:
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.11"]
       fail-fast: false
 
     steps:
@@ -39,8 +55,8 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; else pip install -r requirements.txt; fi
         pip install pytest pytest-django pytest-cov pytest-xdist coverage black flake8 pylint mypy django-stubs
-        # Install compatible version of pylint-django since 3.0.0 is not available
-        pip install pylint-django==2.6.1 --force-reinstall
+        # Install pylint-django with specific version and dependencies
+        pip install pylint-django==2.6.1 pylint-plugin-utils==0.8.2 --force-reinstall
         
     - name: Show environment info
       run: |
@@ -52,6 +68,8 @@ jobs:
         echo "PYTHONPATH: $PYTHONPATH"
         echo "DJANGO_SETTINGS_MODULE: $DJANGO_SETTINGS_MODULE"
         echo "TEST_DB_ENGINE: $TEST_DB_ENGINE"
+        echo "TEST_DB_HOST: $TEST_DB_HOST"
+        echo "TEST_DB_PORT: $TEST_DB_PORT"
         
     - name: Run code quality checks
       run: |
