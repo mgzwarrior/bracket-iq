@@ -1,63 +1,53 @@
 <!-- display_bracket.html -->
 {% extends "base_generic.html" %}
+{% load bracket_filters %}
 
 {% block content %}
-<div class="bracket-header">
-    <h1>{{ bracket.name|default:"My Bracket" }}</h1>
-    <h2>{{ bracket.tournament.name }}</h2>
-</div>
+<div class="container mt-4">
+    <h1>{{ bracket.name }}</h1>
+    <p>Tournament: {{ bracket.tournament.name }}</p>
 
-<div class="bracket-container">
-    {% for round_num, predictions in predictions_by_round.items %}
-        <div class="round">
-            <h3>{{ rounds.get_round_name.value }}</h3>
-            <div class="games">
-                {% for prediction in predictions %}
-                    <div class="game-card">
-                        <div class="game-header">
-                            Game {{ prediction.game.game_number }}
-                        </div>
-                        <div class="teams">
-                            <div class="team {% if prediction.predicted_winner == prediction.game.team1 %}winner{% endif %}">
-                                {% if prediction.game.team1 %}
-                                    {{ prediction.game.team1.name }}
-                                {% else %}
-                                    TBD
-                                {% endif %}
-                            </div>
-                            <div class="vs">vs</div>
-                            <div class="team {% if prediction.predicted_winner == prediction.game.team2 %}winner{% endif %}">
-                                {% if prediction.game.team2 %}
-                                    {{ prediction.game.team2.name }}
-                                {% else %}
-                                    TBD
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% if prediction.game.team1 or prediction.game.team2 %}
-                            <form method="post" action="{% url 'update_prediction' prediction_id=prediction.id %}" class="prediction-form">
-                                {% csrf_token %}
-                                <div class="prediction-controls">
-                                    <label>
-                                        <input type="radio" name="predicted_winner" value="{{ prediction.game.team1.id }}"
-                                            {% if prediction.predicted_winner == prediction.game.team1 %}checked{% endif %}
-                                            {% if not prediction.game.team1 %}disabled{% endif %}>
-                                        {{ prediction.game.team1.name|default:"TBD" }}
-                                    </label>
-                                    <label>
-                                        <input type="radio" name="predicted_winner" value="{{ prediction.game.team2.id }}"
-                                            {% if prediction.predicted_winner == prediction.game.team2 %}checked{% endif %}
-                                            {% if not prediction.game.team2 %}disabled{% endif %}>
-                                        {{ prediction.game.team2.name|default:"TBD" }}
-                                    </label>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Update</button>
-                            </form>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
+    {% for round_value, predictions in predictions_by_round.items %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>{{ round_names|get_item:round_value }}</h3>
         </div>
+        <div class="card-body">
+            {% for prediction_data in predictions %}
+                {% with game=prediction_data.game prediction=prediction_data.prediction bracket_game=prediction_data.bracket_game %}
+                <div class="game-prediction mb-3">
+                    <h4>Game {{ game.game_number }}</h4>
+                    <div class="teams">
+                        <div class="team {% if prediction and prediction.predicted_winner == bracket_game.team1 %}selected{% endif %}">
+                            {{ bracket_game.team1.name|default:"TBD" }}
+                        </div>
+                        <div class="team {% if prediction and prediction.predicted_winner == bracket_game.team2 %}selected{% endif %}">
+                            {{ bracket_game.team2.name|default:"TBD" }}
+                        </div>
+                    </div>
+                    {% if prediction %}
+                    <form method="post" action="{% url 'update_prediction' prediction_id=prediction.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="game" value="{{ game.id }}">
+                        <input type="hidden" name="winner" value="{{ prediction.predicted_winner.id }}">
+                        <button type="submit" class="btn btn-primary">Update Prediction</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{% url 'create_prediction' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="bracket" value="{{ bracket.id }}">
+                        <input type="hidden" name="game" value="{{ game.id }}">
+                        <div class="btn-group" role="group">
+                            <button type="submit" name="winner" value="{{ bracket_game.team1.id }}" class="btn btn-outline-primary" {% if not bracket_game.team1 %}disabled{% endif %}>Pick {{ bracket_game.team1.name|default:"TBD" }}</button>
+                            <button type="submit" name="winner" value="{{ bracket_game.team2.id }}" class="btn btn-outline-primary" {% if not bracket_game.team2 %}disabled{% endif %}>Pick {{ bracket_game.team2.name|default:"TBD" }}</button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
     {% endfor %}
 </div>
 
@@ -111,7 +101,7 @@
     border-radius: 4px;
 }
 
-.team.winner {
+.team.selected {
     background-color: #e3f2fd;
     border-color: #2196f3;
 }
@@ -153,10 +143,40 @@
     border: none;
 }
 
+.btn-outline-primary {
+    background: white;
+    color: #2196f3;
+    border: 1px solid #2196f3;
+}
+
+.btn-outline-primary:hover {
+    background: #2196f3;
+    color: white;
+}
+
+.btn-outline-primary:disabled {
+    background: #f5f5f5;
+    color: #999;
+    border-color: #ddd;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-outline-primary:disabled:hover {
+    background: #f5f5f5;
+    color: #999;
+    border-color: #ddd;
+}
+
 .btn-danger {
     background: #f44336;
     color: white;
     border: none;
+}
+
+.btn-group {
+    display: flex;
+    gap: 0.5rem;
 }
 </style>
 {% endblock %}
