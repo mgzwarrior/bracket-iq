@@ -1,6 +1,5 @@
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import User
 from django.urls import reverse
 from django.contrib.admin.sites import AdminSite
 
@@ -57,6 +56,7 @@ class GameAdminTests(TestCase):
         )
 
         # Create user accounts
+        User = get_user_model()
         cls.admin_user = User.objects.create_superuser(
             username=cls.ADMIN_USERNAME,
             email="admin@example.com",
@@ -292,13 +292,12 @@ class AdminSiteTests(TestCase):
 
     def setUp(self):
         self.client = Client()
-        # Use get_user_model to avoid the imported-auth-user error
-        User = get_user_model()
-        self.admin_user = User.objects.create_superuser(
+        UserModel = get_user_model()
+        self.admin_user = UserModel.objects.create_superuser(
             username="admin", email="admin@example.com", password="adminpass123"
         )
         self.client.login(username="admin", password="adminpass123")
-        self.regular_user = User.objects.create_user(
+        self.regular_user = UserModel.objects.create_user(
             username="user", email="user@example.com", password="userpass123"
         )
 
@@ -324,4 +323,4 @@ class AdminSiteTests(TestCase):
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 200)
         # Check for tournament management elements
-        self.assertContains(response, "Tournament Management") 
+        self.assertContains(response, "Tournament Management")
