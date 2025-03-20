@@ -1,0 +1,35 @@
+{% extends "base_generic.html" %}
+{% load bracket_filters %}
+
+{% block title %}View Bracket - {{ bracket.name }}{% endblock %}
+
+{% block content %}
+<div class="bracket-view">
+    <h2>{{ bracket.name }}</h2>
+    <p>Tournament: {{ bracket.tournament.name }}</p>
+    <p>Created by: {{ bracket.user.username }}</p>
+
+    {% for round_value, predictions in predictions_by_round.items %}
+        <div class="round">
+            <h3>{{ round_names|get_item:round_value }}</h3>
+            <div class="games">
+                {% for prediction in predictions %}
+                    <div class="game">
+                        <div class="team {% if prediction.prediction.predicted_winner == prediction.game.team1 %}selected{% endif %}">
+                            {{ prediction.game.team1.name }} ({{ prediction.game.seed1 }})
+                        </div>
+                        <div class="team {% if prediction.prediction.predicted_winner == prediction.game.team2 %}selected{% endif %}">
+                            {{ prediction.game.team2.name }} ({{ prediction.game.seed2 }})
+                        </div>
+                        {% if prediction.prediction %}
+                            <div class="prediction">
+                                Predicted Winner: {{ prediction.prediction.predicted_winner.name }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %} 

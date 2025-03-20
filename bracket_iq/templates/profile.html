@@ -1,16 +1,67 @@
 {% extends "base_generic.html" %}
 
 {% block content %}
-  <h2>Profile</h2>
-  <p>Welcome, {{ request.user.username }}!</p>
-  <h2>Brackets</h2>
-  {% for bracket in brackets %}
-      <div>
-          <h2>Bracket ID: {{ bracket.uuid }}</h2>
-          <p>Year: {{ bracket.year }}</p>
-          <a href="{% url 'display_bracket' id=bracket.id %}">View Bracket</a>
-      </div>
-  {% empty %}
-      <div>No brackets have been created yet.</div>
-  {% endfor %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="profile-header mb-4">
+                <h1 class="display-4">Profile</h1>
+                <p class="lead">Welcome, {{ request.user.username }}!</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="brackets-section">
+                <h2 class="h3 mb-4">Your Brackets</h2>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    {% for bracket in brackets %}
+                        <div class="col">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-body">
+                                    <h3 class="card-title h5">{{ bracket.tournament.name }}</h3>
+                                    <p class="card-text text-muted">{{ bracket.name }}</p>
+                                </div>
+                                <div class="card-footer bg-transparent border-top-0">
+                                    <a href="{% url 'display_bracket' bracket_id=bracket.id %}" 
+                                       class="btn btn-primary w-100">
+                                        <i class="fas fa-bracket me-2"></i>View Bracket
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-info" role="alert">
+                                <i class="fas fa-info-circle me-2"></i>
+                                You haven't created any brackets yet. 
+                                <a href="{% url 'create_bracket_form' %}" class="alert-link">Create your first bracket!</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.profile-header {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 1rem;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.brackets-section {
+    margin-bottom: 3rem;
+}
+</style>
 {% endblock %}
