@@ -46,7 +46,8 @@
                 <div class="bracket-grid">
                     {% for bracket in user_brackets %}
                         <div class="card">
-                            <h3>{{ bracket.tournament.name }}</h3>
+                            <h3>{{ bracket.name }}</h3>
+                            <p>{{ bracket.tournament.name }}</p>
                             <p>Created: {{ bracket.created_at|date:"M d, Y" }}</p>
                             <div class="card-actions">
                                 <a href="{% url 'display_bracket' bracket_id=bracket.id %}" class="btn">View Bracket</a>

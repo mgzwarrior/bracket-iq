@@ -1,6 +1,5 @@
 # views.py
-import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Union, Optional
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -10,7 +9,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 
-from .forms import GameForm, CustomUserCreationForm
+from .forms import CustomUserCreationForm
 from .models import Team, Game, Bracket, Prediction, Round, Tournament, BracketGame
 
 
@@ -97,45 +96,6 @@ def create_bracket_form(request):
 
 
 @login_required
-def create_live_bracket(request, game_number=1):
-    if request.method == "POST":
-        form = GameForm(request.POST)
-        if form.is_valid():
-            # Get or create a Bracket object for the current user
-            bracket, _ = Bracket.objects.get_or_create(user=request.user)
-
-            # Determine round based on game number
-            round_value = (
-                Round.FIRST_FOUR.value
-                if 1 <= game_number < 5
-                else Round.ROUND_OF_64.value
-            )
-
-            # Create a new game
-            Game.objects.create(
-                seed1=form.cleaned_data["seed1"],
-                team1=form.cleaned_data["team1"],
-                seed2=form.cleaned_data["seed2"],
-                team2=form.cleaned_data["team2"],
-                game_number=game_number,
-                bracket=bracket,
-                round=round_value,
-                year=datetime.date.today().year,
-            )
-            # Redirect to the next game creation page or the completed bracket page
-            if game_number < 68:
-                return redirect("create_live_bracket", game_number=game_number + 1)
-
-            return redirect("display_bracket")
-    else:
-        form = GameForm()
-
-    return render(
-        request, "create_live_bracket.html", {"form": form, "game_number": game_number}
-    )
-
-
-@login_required
 def display_bracket(request, bracket_id):
     # Get the bracket or return 404
     bracket = get_object_or_404(Bracket, pk=bracket_id)
@@ -151,7 +111,9 @@ def display_bracket(request, bracket_id):
     }
 
     # Organize predictions by round for easier rendering
-    predictions_by_round: Dict[int, List[Dict[str, Any]]] = {}
+    predictions_by_round: Dict[
+        int, List[Dict[str, Union[Game, Optional[Prediction], Optional[BracketGame]]]]
+    ] = {}
 
     for game in games:
         round_value = game.round
@@ -176,21 +138,51 @@ def display_bracket(request, bracket_id):
             }
         )
 
+    # Sort games within each round by prediction status and game number
     for round_value, predictions in predictions_by_round.items():
-        # Sort games by game number
         predictions_by_round[round_value] = sorted(
-            predictions, key=lambda p: p["game"].game_number
+            predictions,
+            key=lambda p: (p["prediction"] is not None, p["game"].game_number),
         )
+
+    # Sort rounds by completion status
+    sorted_rounds = []
+    for round_value, predictions in predictions_by_round.items():
+        # Calculate percentage of games predicted in this round
+        total_games = len(predictions)
+        predicted_games = sum(1 for p in predictions if p["prediction"] is not None)
+        completion_percentage = predicted_games / total_games if total_games > 0 else 0
+
+        sorted_rounds.append(
+            {
+                "round_value": round_value,
+                "predictions": predictions,
+                "completion_percentage": completion_percentage,
+            }
+        )
+
+    # Sort rounds - incomplete rounds first, then by round value for tiebreaker
+    sorted_rounds.sort(
+        key=lambda x: (x["completion_percentage"] == 1, x["round_value"])
+    )
 
     # Create a dictionary mapping round values to their labels
     round_names = {}
     for round_enum in Round:
         round_names[round_enum.value] = round_enum.label
 
+    # Create a new sorted dictionary for predictions_by_round
+    sorted_predictions = {}
+    for round_data in sorted_rounds:
+        sorted_predictions[round_data["round_value"]] = round_data["predictions"]
+
     context = {
         "bracket": bracket,
-        "predictions_by_round": predictions_by_round,
+        "predictions_by_round": sorted_predictions,
         "round_names": round_names,
+        "round_completion": {
+            r["round_value"]: r["completion_percentage"] for r in sorted_rounds
+        },
     }
 
     return render(request, "display_bracket.html", context)
@@ -286,9 +278,28 @@ def view_bracket(request, bracket_id):
         "game", "predicted_winner"
     )
 
+    # Organize predictions by round
+    predictions_by_round: Dict[int, List[Dict[str, Union[Game, Prediction]]]] = {}
+    for prediction in predictions:
+        round_value = prediction.game.round
+        if round_value not in predictions_by_round:
+            predictions_by_round[round_value] = []
+        predictions_by_round[round_value].append(
+            {
+                "game": prediction.game,
+                "prediction": prediction,
+            }
+        )
+
+    # Create a dictionary mapping round values to their labels
+    round_names = {}
+    for round_enum in Round:
+        round_names[round_enum.value] = round_enum.label
+
     context = {
         "bracket": bracket,
-        "predictions": predictions,
+        "predictions_by_round": predictions_by_round,
+        "round_names": round_names,
     }
 
     return render(request, "bracket_iq/view_bracket.html", context)
@@ -299,6 +310,7 @@ def view_bracket(request, bracket_id):
 def update_prediction(request, prediction_id):
     # Get the prediction
     prediction = get_object_or_404(Prediction, pk=prediction_id)
+    bracket = prediction.bracket
 
     # Get the game and new predicted winner
     game_id = request.POST.get("game")
@@ -312,12 +324,70 @@ def update_prediction(request, prediction_id):
         game = Game.objects.get(pk=game_id)
         winner = Team.objects.get(pk=winner_id)
 
+        # Get the bracket game to verify teams
+        bracket_game = get_object_or_404(BracketGame, bracket=bracket, game=game)
+
         # Verify this is a valid choice
-        if winner not in [game.team1, game.team2]:
+        if winner not in [bracket_game.team1, bracket_game.team2]:
             return JsonResponse({"success": False, "error": "Invalid winner selection"})
 
-        prediction.predicted_winner = winner
-        prediction.save()
+        with transaction.atomic():
+            # Update the prediction
+            prediction.predicted_winner = winner
+            prediction.save()
+
+            # If this game has a next game, update the teams in the next bracket game
+            if game.next_game:
+                next_game = game.next_game
+                other_game = (
+                    Game.objects.filter(next_game=next_game).exclude(id=game.id).first()
+                )
+
+                # Get or create the next bracket game
+                next_bracket_game, _ = BracketGame.objects.get_or_create(
+                    bracket=bracket,
+                    game=next_game,
+                )
+
+                # Update the next bracket game's teams based on the predictions
+                # If this game has another game feeding into the same next game,
+                # we need to coordinate which team slot to fill
+                if other_game:
+                    # First game in the pair (lower game number) updates team1
+                    if game.game_number < other_game.game_number:
+                        next_bracket_game.team1 = winner
+                        next_bracket_game.team1_seed = (
+                            bracket_game.team1_seed
+                            if winner == bracket_game.team1
+                            else bracket_game.team2_seed
+                        )
+                    # Second game in the pair (higher game number) updates team2
+                    else:
+                        next_bracket_game.team2 = winner
+                        next_bracket_game.team2_seed = (
+                            bracket_game.team1_seed
+                            if winner == bracket_game.team1
+                            else bracket_game.team2_seed
+                        )
+                else:
+                    # If this is the only game feeding into the next game,
+                    # update team1 if it's empty, otherwise update team2
+                    if next_bracket_game.team1 is None:
+                        next_bracket_game.team1 = winner
+                        next_bracket_game.team1_seed = (
+                            bracket_game.team1_seed
+                            if winner == bracket_game.team1
+                            else bracket_game.team2_seed
+                        )
+                    else:
+                        next_bracket_game.team2 = winner
+                        next_bracket_game.team2_seed = (
+                            bracket_game.team1_seed
+                            if winner == bracket_game.team1
+                            else bracket_game.team2_seed
+                        )
+
+                next_bracket_game.save()
 
         return JsonResponse({"success": True})
     except (Game.DoesNotExist, Team.DoesNotExist):
@@ -348,9 +418,12 @@ def create_prediction(request):
         messages.error(request, "Please select a winner")
         return redirect("display_bracket", bracket_id=bracket.id)
 
+    # Get the bracket game to verify teams
+    bracket_game = get_object_or_404(BracketGame, bracket=bracket, game=game)
+
     # Verify this is a valid choice
     winner = get_object_or_404(Team, id=winner_id)
-    if winner not in [game.team1, game.team2]:
+    if winner not in [bracket_game.team1, bracket_game.team2]:
         messages.error(request, "Invalid winner selection")
         return redirect("display_bracket", bracket_id=bracket.id)
 
@@ -380,13 +453,17 @@ def create_prediction(request):
             if game.game_number < other_game.game_number:
                 next_bracket_game.team1 = winner
                 next_bracket_game.team1_seed = (
-                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                    bracket_game.team1_seed
+                    if winner == bracket_game.team1
+                    else bracket_game.team2_seed
                 )
             # Second game in the pair (higher game number) updates team2
             else:
                 next_bracket_game.team2 = winner
                 next_bracket_game.team2_seed = (
-                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                    bracket_game.team1_seed
+                    if winner == bracket_game.team1
+                    else bracket_game.team2_seed
                 )
         else:
             # If this is the only game feeding into the next game,
@@ -394,12 +471,16 @@ def create_prediction(request):
             if next_bracket_game.team1 is None:
                 next_bracket_game.team1 = winner
                 next_bracket_game.team1_seed = (
-                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                    bracket_game.team1_seed
+                    if winner == bracket_game.team1
+                    else bracket_game.team2_seed
                 )
             else:
                 next_bracket_game.team2 = winner
                 next_bracket_game.team2_seed = (
-                    game.seed1 if game.team1_id == int(winner_id) else game.seed2
+                    bracket_game.team1_seed
+                    if winner == bracket_game.team1
+                    else bracket_game.team2_seed
                 )
 
         next_bracket_game.save()
