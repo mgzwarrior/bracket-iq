@@ -2,10 +2,13 @@
 import uuid
 from datetime import date
 from enum import Enum
+import logging
 
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -268,24 +271,24 @@ class Prediction(models.Model):
     def calculate_points(self):
         """Calculate points earned for this prediction."""
         if not self.is_correct:
-            print(f"Not correct for game {self.game.id}")
+            logger.debug("Not correct for game %s", self.game.id)
             return 0
 
         if not self.game:
-            print(f"No game for prediction {self.id}")
+            logger.debug("No game for prediction %s", self.id)
             return 0
 
         if not hasattr(self.game, "round"):
-            print(f"No round for game {self.game.id}")
+            logger.debug("No round for game %s", self.game.id)
             return 0
 
         if not hasattr(self.game, "winner"):
-            print(f"No winner for game {self.game.id}")
+            logger.debug("No winner for game %s", self.game.id)
             return 0
 
         game_round = getattr(self.game, "round", None)
         points = Round.get_points(game_round)
-        print(f"Game {self.game.id} round {game_round} points {points}")
+        logger.debug("Game %s round %s points %s", self.game.id, game_round, points)
         return points
 
     def clean(self):
