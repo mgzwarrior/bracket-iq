@@ -47,17 +47,15 @@ def profile(request):
 @require_POST
 def create_bracket(request, tournament_id):
     tournament = get_object_or_404(Tournament, id=tournament_id)
-    bracket_name = request.POST.get('bracket_name', '').strip()
-    
+    bracket_name = request.POST.get("bracket_name", "").strip()
+
     if not bracket_name:
         messages.error(request, "Bracket name is required.")
-        return redirect('create_bracket_form')
+        return redirect("create_bracket_form")
 
     # Create a new bracket for this user and tournament
     bracket = Bracket.objects.create(
-        user=request.user,
-        tournament=tournament,
-        name=bracket_name
+        user=request.user, tournament=tournament, name=bracket_name
     )
 
     # Get all games for this tournament
@@ -74,7 +72,10 @@ def create_bracket(request, tournament_id):
             team2_seed=game.seed2,
         )
 
-    messages.success(request, "Bracket created successfully. You can now start making your predictions!")
+    messages.success(
+        request,
+        "Bracket created successfully. You can now start making your predictions!",
+    )
     return redirect("display_bracket", bracket_id=bracket.id)
 
 
@@ -358,7 +359,9 @@ def list_brackets(request):
 @require_POST
 def create_prediction(request):
     # Get the bracket and game
-    bracket = get_object_or_404(Bracket, id=request.POST.get("bracket"), user=request.user)
+    bracket = get_object_or_404(
+        Bracket, id=request.POST.get("bracket"), user=request.user
+    )
     game = get_object_or_404(Game, id=request.POST.get("game"))
     winner_id = request.POST.get("winner")
 
@@ -373,19 +376,15 @@ def create_prediction(request):
         return redirect("display_bracket", bracket_id=bracket.id)
 
     # Create or update the prediction
-    prediction, created = Prediction.objects.update_or_create(
-        bracket=bracket,
-        game=game,
-        defaults={"predicted_winner": winner}
+    prediction, _ = Prediction.objects.update_or_create(
+        bracket=bracket, game=game, defaults={"predicted_winner": winner}
     )
 
     # If this game has a next game, update the teams in the next bracket game
     if game.next_game:
         next_game = game.next_game
         other_game = (
-            Game.objects.filter(next_game=next_game)
-            .exclude(id=game.id)
-            .first()
+            Game.objects.filter(next_game=next_game).exclude(id=game.id).first()
         )
 
         # Get the other game's prediction if it exists

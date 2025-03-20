@@ -225,9 +225,9 @@ class GameAdmin(admin.ModelAdmin):
     def matchup(self, obj):
         if obj.team1 and obj.team2:
             return f"({obj.seed1}) {obj.team1.name} vs ({obj.seed2}) {obj.team2.name}"
-        elif obj.team1:
+        if obj.team1:
             return f"({obj.seed1}) {obj.team1.name} vs TBD"
-        elif obj.team2:
+        if obj.team2:
             return f"TBD vs ({obj.seed2}) {obj.team2.name}"
         return "TBD"
 
@@ -420,16 +420,23 @@ class BracketGameAdmin(admin.ModelAdmin):
         "updated_at",
     )
     list_filter = ("bracket__tournament", "game__round", "game__region")
-    search_fields = ("bracket__name", "bracket__user__username", "team1__name", "team2__name")
+    search_fields = (
+        "bracket__name",
+        "bracket__user__username",
+        "team1__name",
+        "team2__name",
+    )
     readonly_fields = ("created_at", "updated_at")
 
     def bracket_name(self, obj):
         return obj.bracket.name
+
     bracket_name.short_description = "Bracket Name"
     bracket_name.admin_order_field = "bracket__name"
 
     def bracket_user(self, obj):
         return obj.bracket.user.username
+
     bracket_user.short_description = "User"
     bracket_user.admin_order_field = "bracket__user__username"
 

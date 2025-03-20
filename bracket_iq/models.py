@@ -262,20 +262,43 @@ class Prediction(models.Model):
 
 class BracketGame(models.Model):
     """Tracks which teams should appear in each game based on predictions within a specific bracket."""
-    bracket = models.ForeignKey(Bracket, on_delete=models.CASCADE, related_name='bracket_games')
-    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='bracket_games')
-    team1: models.ForeignKey = models.ForeignKey(Team, related_name='bracket_games_team1', null=True, blank=True, on_delete=models.SET_NULL)
-    team2: models.ForeignKey = models.ForeignKey(Team, related_name='bracket_games_team2', null=True, blank=True, on_delete=models.SET_NULL)
-    team1_seed = models.IntegerField(null=True, blank=True)
-    team2_seed = models.IntegerField(null=True, blank=True)
-    winner = models.ForeignKey(Team, related_name='bracket_games_won', null=True, blank=True, on_delete=models.SET_NULL)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+
+    bracket: models.ForeignKey = models.ForeignKey(
+        Bracket, on_delete=models.CASCADE, related_name="bracket_games"
+    )
+    game: models.ForeignKey = models.ForeignKey(
+        Game, on_delete=models.CASCADE, related_name="bracket_games"
+    )
+    team1: models.ForeignKey = models.ForeignKey(
+        Team,
+        related_name="bracket_games_team1",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    team2: models.ForeignKey = models.ForeignKey(
+        Team,
+        related_name="bracket_games_team2",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    team1_seed: models.IntegerField = models.IntegerField(null=True, blank=True)
+    team2_seed: models.IntegerField = models.IntegerField(null=True, blank=True)
+    winner: models.ForeignKey = models.ForeignKey(
+        Team,
+        related_name="bracket_games_won",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
+    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
 
     class Meta:
         app_label = "bracket_iq"
-        unique_together = ['bracket', 'game']
-        ordering = ['game__game_number']
+        unique_together = ["bracket", "game"]
+        ordering = ["game__game_number"]
 
     def __str__(self):
         team1_name = self.team1.name if self.team1 else "TBD"
