@@ -376,7 +376,7 @@ def create_prediction(request):
         return redirect("display_bracket", bracket_id=bracket.id)
 
     # Create or update the prediction
-    prediction, _ = Prediction.objects.update_or_create(
+    _, _ = Prediction.objects.update_or_create(
         bracket=bracket, game=game, defaults={"predicted_winner": winner}
     )
 
