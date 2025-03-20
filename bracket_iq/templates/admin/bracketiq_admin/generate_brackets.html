@@ -17,7 +17,7 @@
         font-weight: bold;
         color: var(--body-fg);
     }
-    .form-row select, .form-row input {
+    .form-row select, .form-row input:not([type="checkbox"]) {
         font-size: var(--font-size);
         padding: 5px;
         border: 1px solid var(--border-color);
@@ -25,6 +25,27 @@
         background-color: var(--body-bg);
         color: var(--body-fg);
         width: 300px;
+    }
+    .form-row input[type="checkbox"] {
+        margin-right: 8px;
+        vertical-align: middle;
+        flex-shrink: 0;
+    }
+    .form-row label[for="use_current_user"] {
+        display: inline-flex;
+        align-items: flex-start;
+        font-weight: normal;
+        width: 100%;
+        margin-bottom: 0;
+        cursor: pointer;
+    }
+    .form-row .checkbox-container {
+        display: flex;
+        flex-direction: column;
+    }
+    .checkbox-label-content {
+        display: flex;
+        flex-direction: column;
     }
     .help {
         font-size: var(--font-size-small);
@@ -84,10 +105,14 @@
                 </div>
             </div>
             <div class="form-row">
-                <div>
-                    <label for="user_prefix">User Prefix:</label>
-                    <input type="text" name="user_prefix" id="user_prefix" value="AutoGen" required>
-                    <p class="help">This will be used to create usernames for the generated brackets (e.g., "AutoGen_1", "AutoGen_2", etc.)</p>
+                <div class="checkbox-container">
+                    <label for="use_current_user">
+                        <input type="checkbox" name="use_current_user" id="use_current_user" value="true">
+                        <div class="checkbox-label-content">
+                            Use current user instead of auto-generating users
+                            <p class="help">If checked, all generated brackets will be owned by your admin account instead of creating new users.</p>
+                        </div>
+                    </label>
                 </div>
             </div>
         </fieldset>
