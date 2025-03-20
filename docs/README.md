@@ -1,5 +1,7 @@
 # BracketIQ 🏀
 
+[![Main Branch CI](https://github.com/mgzwarrior/bracket-iq/actions/workflows/python-ci.yml/badge.svg)](https://github.com/mgzwarrior/bracket-iq/actions/workflows/python-ci.yml)
+
 Your intelligent March Madness bracket assistant! BracketIQ helps you create, manage, and analyze your tournament brackets with advanced analytics and machine learning.
 
 ## Quick Start
