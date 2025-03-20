@@ -11,8 +11,8 @@ if [ "$(service_running web)" ]; then
     docker compose exec web python manage.py "$@"
 else
     # Activate virtual environment if it exists
-    if [ -d "venv" ]; then
-        source venv/bin/activate
+    if [ -d "venv_py3.13" ]; then
+        source venv_py3.13/bin/activate
     fi
     python manage.py "$@"
 fi 

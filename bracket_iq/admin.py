@@ -1,16 +1,30 @@
 import datetime
 import re
+import random
 
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.contrib.admin import AdminSite, SimpleListFilter
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
-from django.core.management import call_command, get_commands
-from django.shortcuts import redirect, render
-from django.template.response import TemplateResponse
+from django.contrib.auth import get_user_model
+from django.contrib import messages
 from django.urls import path
+from django.shortcuts import render, redirect
+from django.core.management import call_command, get_commands
+from django.template.response import TemplateResponse
 from django import forms
+import django.db
 
-from .models import Tournament, Team, Game, Bracket, Prediction, BracketGame
+from .models import (
+    Tournament,
+    Team,
+    Game,
+    Bracket,
+    BracketGame,
+    Prediction,
+    BracketStrategy,
+)
+
+User = get_user_model()
 
 
 class BracketIQAdminSite(AdminSite):
@@ -26,6 +40,11 @@ class BracketIQAdminSite(AdminSite):
                 "seed_tournament/",
                 self.admin_view(self.seed_tournament_view),
                 name="seed_tournament",
+            ),
+            path(
+                "generate_brackets/",
+                self.admin_view(self.generate_brackets_view),
+                name="generate_brackets",
             ),
         ]
         return custom_urls + urls
@@ -82,6 +101,216 @@ class BracketIQAdminSite(AdminSite):
         return TemplateResponse(
             request, "admin/bracketiq_admin/seed_tournament.html", context
         )
+
+    def generate_brackets_view(self, request):
+        context = dict(
+            self.each_context(request),
+            # Add these context variables for the breadcrumbs
+            opts=type(
+                "Opts",
+                (),
+                {
+                    "app_label": "bracket_iq",
+                    "app_config": type(
+                        "AppConfig", (), {"verbose_name": "Bracket IQ"}
+                    )(),
+                    "model_name": "bracket",
+                },
+            ),
+        )
+
+        # Get all tournaments
+        tournaments = Tournament.objects.all().order_by("-year")
+        context["tournaments"] = tournaments
+
+        # Get all strategies
+        context["strategies"] = [
+            {"value": strategy.value, "label": strategy.label}
+            for strategy in BracketStrategy
+        ]
+
+        if request.method == "POST":
+            tournament_id = request.POST.get("tournament")
+            strategy = request.POST.get("strategy")
+            num_brackets = request.POST.get("num_brackets", "1")
+            user_prefix = request.POST.get("user_prefix", "AutoGen")
+
+            if not all([tournament_id, strategy, num_brackets]):
+                messages.error(request, "All fields are required.")
+                return TemplateResponse(
+                    request, "admin/bracketiq_admin/generate_brackets.html", context
+                )
+
+            try:
+                tournament = Tournament.objects.get(id=tournament_id)
+                strategy_enum = BracketStrategy.from_value(strategy)
+                num_brackets = int(num_brackets)
+
+                # Get all games for this tournament
+                games = Game.objects.filter(tournament=tournament).order_by(
+                    "round", "game_number"
+                )
+
+                # Create brackets and predictions
+                for i in range(num_brackets):
+                    # Create a user for this bracket
+                    username = f"{user_prefix}_{i+1}"
+                    user = User.objects.get_or_create(
+                        username=username,
+                        defaults={
+                            "email": f"{username}@example.com",
+                            "is_active": True,
+                        },
+                    )[0]
+
+                    # Create the bracket
+                    # Find the highest counter for this strategy
+                    base_name = f"{strategy_enum.label} Bracket"
+                    existing_brackets = Bracket.objects.filter(
+                        name__startswith=base_name, tournament=tournament
+                    ).order_by("-name")
+
+                    # Get the highest counter
+                    counter = 1
+                    if existing_brackets.exists():
+                        last_bracket = existing_brackets.first()
+                        try:
+                            counter = int(last_bracket.name.split()[-1]) + 1
+                        except (ValueError, IndexError):
+                            counter = existing_brackets.count() + 1
+
+                    bracket = Bracket.objects.create(
+                        user=user, tournament=tournament, name=f"{base_name} {counter}"
+                    )
+
+                    # Create bracket games
+                    for game in games:
+                        BracketGame.objects.create(
+                            bracket=bracket,
+                            game=game,
+                            team1=game.team1,
+                            team2=game.team2,
+                            team1_seed=game.seed1,
+                            team2_seed=game.seed2,
+                        )
+
+                    # Generate predictions based on strategy
+                    self._generate_predictions(bracket, games, strategy_enum)
+
+                messages.success(
+                    request,
+                    f"Successfully generated {num_brackets} brackets using {strategy_enum.label} strategy.",
+                )
+                return redirect("admin:bracket_iq_bracket_changelist")
+
+            except Tournament.DoesNotExist:
+                messages.error(
+                    request, f"Tournament with ID {tournament_id} does not exist."
+                )
+            except ValueError as e:
+                if "BracketStrategy" in str(e):
+                    messages.error(request, f"Invalid strategy: {strategy}")
+                else:
+                    messages.error(
+                        request, f"Invalid number of brackets: {num_brackets}"
+                    )
+            except django.db.Error as e:
+                messages.error(
+                    request, f"Database error while creating bracket: {str(e)}"
+                )
+            return TemplateResponse(
+                request, "admin/bracketiq_admin/generate_brackets.html", context
+            )
+
+        return TemplateResponse(
+            request, "admin/bracketiq_admin/generate_brackets.html", context
+        )
+
+    def _generate_predictions(self, bracket, games, strategy):
+        """Generate predictions for a bracket based on the selected strategy."""
+
+        def predict_and_advance(game, bracket_game):
+            """Helper function to generate prediction and advance winner recursively"""
+            # Skip if prediction already exists
+            if Prediction.objects.filter(bracket=bracket, game=game).exists():
+                return
+
+            # Generate prediction for this game
+            if strategy == BracketStrategy.RANDOM:
+                winner = random.choice([bracket_game.team1, bracket_game.team2])
+            elif strategy == BracketStrategy.HIGHER_SEED:
+                if bracket_game.team1_seed < bracket_game.team2_seed:
+                    winner = bracket_game.team1
+                else:
+                    winner = bracket_game.team2
+            else:  # HIGHER_SEED_WITH_UPSETS
+                if random.random() < 0.8:
+                    if bracket_game.team1_seed < bracket_game.team2_seed:
+                        winner = bracket_game.team1
+                    else:
+                        winner = bracket_game.team2
+                else:
+                    if bracket_game.team1_seed < bracket_game.team2_seed:
+                        winner = bracket_game.team2
+                    else:
+                        winner = bracket_game.team1
+
+            # Create the prediction
+            Prediction.objects.create(
+                bracket=bracket, game=game, predicted_winner=winner
+            )
+
+            # Update the next game if it exists
+            if game.next_game:
+                next_game = game.next_game
+                next_bracket_game = BracketGame.objects.get(
+                    bracket=bracket, game=next_game
+                )
+
+                # Update the next game's teams based on the prediction
+                winner_seed = (
+                    bracket_game.team1_seed
+                    if winner == bracket_game.team1
+                    else bracket_game.team2_seed
+                )
+
+                if next_bracket_game.team1 is None:
+                    next_bracket_game.team1 = winner
+                    next_bracket_game.team1_seed = winner_seed
+                elif next_bracket_game.team2 is None:
+                    next_bracket_game.team2 = winner
+                    next_bracket_game.team2_seed = winner_seed
+
+                next_bracket_game.save()
+
+                # If both teams are now set in the next game, predict that game too
+                if next_bracket_game.team1 and next_bracket_game.team2:
+                    predict_and_advance(next_game, next_bracket_game)
+
+        # Process all games in round order
+        for game in games.order_by("round", "game_number"):
+            bracket_game = BracketGame.objects.get(bracket=bracket, game=game)
+
+            # Skip games that don't have both teams yet
+            if not bracket_game.team1 or not bracket_game.team2:
+                continue
+
+            predict_and_advance(game, bracket_game)
+
+    def create_user(self, request, username, email, password):
+        """Create a new user with the given username, email, and password."""
+        user = User.objects.get_or_create(
+            username=username,
+            defaults={
+                "email": email,
+                "is_active": True,
+                "is_staff": True,
+                "is_superuser": True,
+            },
+        )[0]
+        user.set_password(password)
+        user.save()
+        return user
 
 
 class GameForm(forms.ModelForm):
@@ -389,7 +618,7 @@ class TeamAdmin(admin.ModelAdmin):
 
 @admin.register(Bracket)
 class BracketAdmin(admin.ModelAdmin):
-    list_display = ("user", "tournament", "score", "created_at")
+    list_display = ("name", "user", "tournament", "score", "created_at")
     list_filter = ("tournament",)
     search_fields = ("user__username",)
 
@@ -397,15 +626,21 @@ class BracketAdmin(admin.ModelAdmin):
 @admin.register(Prediction)
 class PredictionAdmin(admin.ModelAdmin):
     list_display = (
-        "bracket",
+        "bracket_name",
         "game",
         "predicted_winner",
         "is_correct",
         "points_earned",
     )
-    list_filter = ("bracket__tournament", "is_correct")
-    search_fields = ("bracket__user__username",)
+    list_filter = ("bracket__tournament", "bracket__name", "is_correct")
+    search_fields = ("bracket__user__username", "bracket__name")
     readonly_fields = ("points_earned",)
+
+    def bracket_name(self, obj):
+        return obj.bracket.name
+
+    bracket_name.short_description = "Bracket"
+    bracket_name.admin_order_field = "bracket__name"
 
 
 @admin.register(BracketGame)
@@ -419,7 +654,12 @@ class BracketGameAdmin(admin.ModelAdmin):
         "status",
         "updated_at",
     )
-    list_filter = ("bracket__tournament", "game__round", "game__region")
+    list_filter = (
+        "bracket__tournament",
+        "bracket__name",
+        "game__round",
+        "game__region",
+    )
     search_fields = (
         "bracket__name",
         "bracket__user__username",

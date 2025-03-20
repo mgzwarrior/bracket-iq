@@ -60,6 +60,30 @@ class Round(Enum):
         return self.label
 
 
+class BracketStrategy(Enum):
+    RANDOM = "RANDOM", "Random Choice"
+    HIGHER_SEED = "HIGHER_SEED", "Higher Seed"
+    HIGHER_SEED_WITH_UPSETS = "HIGHER_SEED_WITH_UPSETS", "Higher Seed with Upsets"
+
+    def __init__(self, strategy_id, label):
+        self.strategy_id = strategy_id
+        self.label = label
+
+    @classmethod
+    def from_value(cls, value):
+        for member in cls:
+            if member.strategy_id == value:
+                return member
+        raise ValueError(f"{value} is not a valid {cls.__name__}")
+
+    @property
+    def value(self):
+        return self.strategy_id
+
+    def __str__(self):
+        return self.label
+
+
 class Tournament(models.Model):
     uuid: models.UUIDField = models.UUIDField(
         default=uuid.uuid4, editable=False, unique=True

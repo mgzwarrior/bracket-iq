@@ -1,0 +1,101 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+<style>
+    .form-row {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--hairline-color);
+    }
+    .form-row label {
+        display: block;
+        padding: 0 10px 0 0;
+        margin-bottom: 8px;
+        font-size: var(--font-size);
+        font-weight: bold;
+        color: var(--body-fg);
+    }
+    .form-row select, .form-row input {
+        font-size: var(--font-size);
+        padding: 5px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--body-bg);
+        color: var(--body-fg);
+        width: 300px;
+    }
+    .help {
+        font-size: var(--font-size-small);
+        color: var(--body-quiet-color);
+        margin-top: 4px;
+    }
+    .submit-row {
+        padding: 12px;
+        margin: 15px 0;
+        text-align: right;
+    }
+</style>
+{% endblock %}
+
+{% block coltype %}colM{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; {% trans 'Generate Brackets' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <form method="post">
+        {% csrf_token %}
+        <fieldset class="module aligned">
+            <div class="form-row">
+                <div>
+                    <label for="tournament">Tournament:</label>
+                    <select name="tournament" id="tournament" required>
+                        <option value="">---------</option>
+                        {% for tournament in tournaments %}
+                        <option value="{{ tournament.id }}">{{ tournament.name }} ({{ tournament.year }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div>
+                    <label for="strategy">Strategy:</label>
+                    <select name="strategy" id="strategy" required>
+                        <option value="">---------</option>
+                        {% for strategy in strategies %}
+                        <option value="{{ strategy.value }}">{{ strategy.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div>
+                    <label for="num_brackets">Number of Brackets:</label>
+                    <input type="number" name="num_brackets" id="num_brackets" min="1" value="1" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div>
+                    <label for="user_prefix">User Prefix:</label>
+                    <input type="text" name="user_prefix" id="user_prefix" value="AutoGen" required>
+                    <p class="help">This will be used to create usernames for the generated brackets (e.g., "AutoGen_1", "AutoGen_2", etc.)</p>
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit" value="Generate Brackets" class="default">
+            <a href="{% url 'admin:index' %}" class="closelink">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %} 
