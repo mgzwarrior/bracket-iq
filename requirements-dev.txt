@@ -8,6 +8,7 @@ pylint-django==2.6.1
 mypy==1.9.0
 django-stubs==4.2.7
 coverage==7.5.0
+pandas-stubs==2.2.3.250308
 
 # Pre-commit
 pre-commit==3.7.0 

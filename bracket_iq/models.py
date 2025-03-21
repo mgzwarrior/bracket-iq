@@ -96,7 +96,7 @@ class BracketStrategy(Enum):
         return self.value in [
             "HISTORICAL_ANALYSIS",
             "STATISTICAL_MATCHUP",
-            "COMPOSITE_AI"
+            "COMPOSITE_AI",
         ]
 
     def get_required_stats(self):
@@ -109,11 +109,11 @@ class BracketStrategy(Enum):
                 "three-point-percentage",
                 "free-throw-percentage",
                 "rebound-margin",
-                "turnover-margin"
+                "turnover-margin",
             ]
-        elif self.value == "HISTORICAL_ANALYSIS":
+        if self.value == "HISTORICAL_ANALYSIS":
             return ["tournament-history", "head-to-head"]
-        elif self.value == "COMPOSITE_AI":
+        if self.value == "COMPOSITE_AI":
             # Composite strategy needs all available stats
             return [
                 "scoring-offense",
@@ -126,7 +126,7 @@ class BracketStrategy(Enum):
                 "tournament-history",
                 "head-to-head",
                 "win-loss-record",
-                "strength-of-schedule"
+                "strength-of-schedule",
             ]
         return []
 
